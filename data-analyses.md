@@ -503,7 +503,7 @@ ggplot(metadata, aes(color=seq_folder, x=mitoRatio, fill=seq_folder)) +
   geom_vline(xintercept = 0.2)
 ```
 
-![](assets/snrnaseqQC6-1.png)<!-- -->
+![](assets/snrnaseqQC6-1.png)
 
 ## 1.4 Data filtering
 
@@ -538,7 +538,7 @@ v3 <- VlnPlot(bapd8.combined, features = "percent.mt", pt.size = 1) +
 v1 | v2 | v3
 ```
 
-![](assets/filtering2-1.png)<!-- -->
+![](assets/filtering2-1.png)
 
 ### 1.4.3 Before filtering
 
@@ -548,7 +548,7 @@ B2 <- FeatureScatter(bapd8.combined, feature1 = "nCount_RNA", feature2 = "nFeatu
 B1 | B2
 ```
 
-![](assets/filtering3-1.png)<!-- -->
+![](assets/filtering3-1.png)
 
 ### 1.4.4 Preliminary filtering
 
@@ -560,7 +560,7 @@ I2 <- FeatureScatter(bapd8.combined, feature1 = "nCount_RNA", feature2 = "nFeatu
 I1 | I2
 ```
 
-![](assets/filtering4-1.png)<!-- -->
+![](assets/filtering4-1.png)
 
 ### 1.4.5 Final filtering
 
@@ -571,7 +571,7 @@ A2 <- FeatureScatter(bapd8.combined, feature1 = "nCount_RNA", feature2 = "nFeatu
 A1 | A2
 ```
 
-![](assets/filtering5-1.png)<!-- -->
+![](assets/filtering5-1.png)
 
 ### 1.4.6 Removing ribosomal and MT proteins
 
@@ -873,7 +873,7 @@ grouped_violinPlots <- function(markersfile, clusternumber, seuratobject = bapd8
 grouped_violinPlots(markers.filtered.names.1, 1)
 ```
 
-![](assets/cluster1-1.png)<!-- -->
+![](assets/cluster1-1.png)
 
 ### 1.7.2 Markers of cluster 2
 
@@ -881,7 +881,7 @@ grouped_violinPlots(markers.filtered.names.1, 1)
 grouped_violinPlots(markers.filtered.names.2, 2)
 ```
 
-![](assets/cluster2-1.png)<!-- -->
+![](assets/cluster2-1.png)
 
 ### 1.7.3 Markers of cluster 3
 
@@ -889,7 +889,7 @@ grouped_violinPlots(markers.filtered.names.2, 2)
 grouped_violinPlots(markers.filtered.names.3, 3)
 ```
 
-![](assets/cluster3-1.png)<!-- -->
+![](assets/cluster3-1.png)
 
 ### 1.7.4 Markers of cluster 4
 
@@ -897,7 +897,7 @@ grouped_violinPlots(markers.filtered.names.3, 3)
 grouped_violinPlots(markers.filtered.names.4, 4)
 ```
 
-![](assets/cluster4-1.png)<!-- -->
+![](assets/cluster4-1.png)
 
 ### 1.7.5 Markers of cluster 5
 
@@ -905,7 +905,7 @@ grouped_violinPlots(markers.filtered.names.4, 4)
 grouped_violinPlots(markers.filtered.names.5, 5)
 ```
 
-![](assets/cluster5-1.png)<!-- -->
+![](assets/cluster5-1.png)
 
 ### 1.7.6 Markers of cluster 6
 
@@ -913,7 +913,7 @@ grouped_violinPlots(markers.filtered.names.5, 5)
 grouped_violinPlots(markers.filtered.names.6, 6)
 ```
 
-![](assets/cluster6-1.png)<!-- -->
+![](assets/cluster6-1.png)
 
 ### 1.7.7 Markers of cluster 7
 
@@ -921,7 +921,7 @@ grouped_violinPlots(markers.filtered.names.6, 6)
 grouped_violinPlots(markers.filtered.names.7, 7)
 ```
 
-![](assets/cluster7-1.png)<!-- -->
+![](assets/cluster7-1.png)
 
 ### 1.7.8 Markers of cluster 8
 
@@ -929,7 +929,7 @@ grouped_violinPlots(markers.filtered.names.7, 7)
 grouped_violinPlots(markers.filtered.names.8, 8)
 ```
 
-![](assets/cluster8-1.png)<!-- -->
+![](assets/cluster8-1.png)
 
 ### 1.7.9 Markers of cluster 9
 
@@ -937,7 +937,7 @@ grouped_violinPlots(markers.filtered.names.8, 8)
 grouped_violinPlots(markers.filtered.names.9, 9)
 ```
 
-![](assets/cluster9-1.png)<!-- -->
+![](assets/cluster9-1.png)
 
 ## 1.8 Run PlacentaCellEnrich on markers
 
@@ -989,7 +989,7 @@ runpce(markers.filtered.names.1, 1)
 #> [1] 140
 ```
 
-![](assets/runPCE1-1.png)<!-- -->
+![](assets/runPCE1-1.png)
 
 ### 1.8.2 PCE for cluster 2 markers
 
@@ -998,7 +998,7 @@ runpce(markers.filtered.names.2, 2)
 #> [1] 168
 ```
 
-![](assets/runPCE2-1.png)<!-- -->
+![](assets/runPCE2-1.png)
 
 ### 1.8.3 PCE for cluster 3 markers
 
@@ -1007,7 +1007,7 @@ runpce(markers.filtered.names.3, 3)
 #> [1] 667
 ```
 
-![](assets/runPCE3-1.png)<!-- -->
+![](assets/runPCE3-1.png)
 
 ### 1.8.4 PCE for cluster 4 markers
 
@@ -1016,7 +1016,7 @@ runpce(markers.filtered.names.4, 4)
 #> [1] 145
 ```
 
-![](assets/runPCE4-1.png)<!-- -->
+![](assets/runPCE4-1.png)
 
 ### 1.8.5 PCE for cluster 5 markers
 
@@ -1025,7 +1025,7 @@ runpce(markers.filtered.names.5, 5)
 #> [1] 310
 ```
 
-![](assets/runPCE5-1.png)<!-- -->
+![](assets/runPCE5-1.png)
 
 ### 1.8.6 PCE for cluster 6 markers
 
@@ -1034,7 +1034,7 @@ runpce(markers.filtered.names.6, 6)
 #> [1] 376
 ```
 
-![](assets/runPCE6-1.png)<!-- -->
+![](assets/runPCE6-1.png)
 
 ### 1.8.7 PCE for cluster 7 markers
 
@@ -1043,7 +1043,7 @@ runpce(markers.filtered.names.7, 7)
 #> [1] 188
 ```
 
-![](assets/runPCE7-1.png)<!-- -->
+![](assets/runPCE7-1.png)
 
 ### 1.8.8 PCE for cluster 8 markers
 
@@ -1052,7 +1052,7 @@ runpce(markers.filtered.names.8, 8)
 #> [1] 162
 ```
 
-![](assets/runPCE8-1.png)<!-- -->
+![](assets/runPCE8-1.png)
 
 ### 1.8.9 PCE for cluster 9 markers
 
@@ -1061,7 +1061,7 @@ runpce(markers.filtered.names.9, 9)
 #> [1] 407
 ```
 
-![](assets/runPCE9-1.png)<!-- -->
+![](assets/runPCE9-1.png)
 
 ## 1.9 Plotting functions
 
@@ -1261,9 +1261,9 @@ ggplot(cells, aes(x = cluster, y = number.of.cells, fill = cluster )) +
   theme(legend.position = "none")
 ```
 
-![](assets/clusterstats-1.png)<!-- -->
+![](assets/clusterstats-1.png)
 
-## 1.10 DE between conditions
+## 1.10 DE between conditions and Volcano plots
 
 The DE was carried out between the conditions for each cluster. First we
 modified the metadata to create a separate column that has both the
@@ -1328,9 +1328,9 @@ commands.p <- paste(paste(lhs.p, rhs.p, sep="<-"), collapse=";")
 eval(parse(text=commands.p))
 ```
 
-### 1.10.1 Volcano Plot function
 
-This plots allows us to visualize the genes that are overexpressed in
+
+Volcano plots: These plots allows us to visualize the genes that are overexpressed in
 each condition along with its p-value. First, we will setup a function
 to make a volcano plot and then we call them for each cluster and depict
 them as an interactive plot.
@@ -1349,7 +1349,7 @@ return(de)
 }
 ```
 
-### 1.10.2 Volcano plot for cluster 1
+### 1.10.1 Volcano plot for cluster 1
 
 ``` r
 #ggplotly(myVolcanoPlot(clus1.five.twenty, 1))
@@ -1359,7 +1359,7 @@ myVolcanoPlot(clus1.five.twenty, 1)
 ![Fig.6-1: Interactive Volcano plot showing genes overexpressed in 5%
 and 20% oxygen conditions for cluster 1](assets/de.clus1-1.png)
 
-### 1.10.3 Volcano plot for cluster 2
+### 1.10.2 Volcano plot for cluster 2
 
 ``` r
 #ggplotly(myVolcanoPlot(clus2.five.twenty, 2))
@@ -1369,7 +1369,7 @@ myVolcanoPlot(clus2.five.twenty, 2)
 ![Fig.6-2: Interactive Volcano plot showing genes overexpressed in 5%
 and 20% oxygen conditions for cluster 2](assets/de.clus2-1.png)
 
-### 1.10.4 Volcano plot for cluster 3
+### 1.10.3 Volcano plot for cluster 3
 
 ``` r
 #ggplotly(myVolcanoPlot(clus3.five.twenty, 3))
@@ -1380,6 +1380,7 @@ myVolcanoPlot(clus3.five.twenty, 3)
 and 20% oxygen conditions for cluster 3](assets/de.clus3-1.png) \#\#\#
 Volcano plot for cluster 4
 
+### 1.10.4 Volcano plot for cluster 4
 ``` r
 #ggplotly(myVolcanoPlot(clus4.five.twenty, 4))
 myVolcanoPlot(clus4.five.twenty, 4)
@@ -1388,6 +1389,8 @@ myVolcanoPlot(clus4.five.twenty, 4)
 ![Fig.6-4: Interactive Volcano plot showing genes overexpressed in 5%
 and 20% oxygen conditions for cluster 4](assets/de.clus4-1.png) \#\#\#
 Volcano plot for cluster 5
+
+### 1.10.5 Volcano plot for cluster 5
 
 ``` r
 #ggplotly(myVolcanoPlot(clus5.five.twenty, 5))
@@ -1398,6 +1401,8 @@ myVolcanoPlot(clus5.five.twenty, 5)
 and 20% oxygen conditions for cluster 5](assets/de.clus5-1.png) \#\#\#
 Volcano plot for cluster 6
 
+### 1.10.6 Volcano plot for cluster 6
+
 ``` r
 #ggplotly(myVolcanoPlot(clus6.five.twenty, 6))
 myVolcanoPlot(clus6.five.twenty, 6)
@@ -1406,6 +1411,8 @@ myVolcanoPlot(clus6.five.twenty, 6)
 ![Fig.6-6: Interactive Volcano plot showing genes overexpressed in 5%
 and 20% oxygen conditions for cluster 6](assets/de.clus6-1.png) \#\#\#
 Volcano plot for cluster 7
+
+### 1.10.7 Volcano plot for cluster 7
 
 ``` r
 #ggplotly(myVolcanoPlot(clus7.five.twenty, 7))
@@ -1416,6 +1423,8 @@ myVolcanoPlot(clus7.five.twenty, 7)
 and 20% oxygen conditions for cluster 7](assets/de.clus7-1.png) \#\#\#
 Volcano plot for cluster 8
 
+### 1.10.8 Volcano plot for cluster 8
+
 ``` r
 #ggplotly(myVolcanoPlot(clus8.five.twenty, 8))
 myVolcanoPlot(clus8.five.twenty, 8)
@@ -1424,6 +1433,8 @@ myVolcanoPlot(clus8.five.twenty, 8)
 ![Fig.6-8: Interactive Volcano plot showing genes overexpressed in 5%
 and 20% oxygen conditions for cluster 8](assets/de.clus8-1.png) \#\#\#
 Volcano plot for cluster 9
+
+### 1.10.9 Volcano plot for cluster 9
 
 ``` r
 #ggplotly(myVolcanoPlot(clus9.five.twenty, 9))

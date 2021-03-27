@@ -1,0 +1,1134 @@
+---
+title: 'BAP treated hESC (day 8) snRNAseq data analyses '
+author: "Arun Seetharam"
+date: "3/24/2021"
+output:
+  html_document:
+    number_sections: yes
+    toc: yes
+    toc_float: yes
+    toc_depth: 3
+editor_options:
+  chunck_output_type: console
+---
+
+```{r setup, include=FALSE}
+
+knitr::opts_chunk$set(
+  echo = TRUE,
+  collapse = TRUE,
+  comment = "#>",
+  fig.path = "assets/"
+)
+```
+
+# snRNAseq data analyses
+
+
+## Prerequisites
+
+This experiment has 2 conditions (BAP treated hESC exposed to 20% oxygen and 5% oxygen), with 2 replicates each. The details are provided in the manuscript. 
+The packages that are needed for the analyses were loaded as below. If you need the version information, session information is printed at the bottom of this wiki.
+
+
+```{r, warnings=TRUE, messages=FALSE}
+setwd("~/TutejaLab/snn-results_20210308_testing-installation")
+# load the modules
+library(Seurat)
+library(SeuratWrappers)
+library(knitr)
+library(kableExtra)
+library(ggplot2)
+library(cowplot)
+library(patchwork)
+library(metap)
+library(multtest)
+library(gridExtra)
+library(dplyr)
+library(stringr)
+library(TissueEnrich)
+library(gprofiler2)
+library(tidyverse)
+library(enhancedDimPlot)
+library(calibrate)
+library(ggrepel)
+library(dittoSeq)
+library(ComplexHeatmap)
+library(scales)
+library(ggvenn)
+library(plotly)
+library(DT)
+library(cerebroApp)
+library(ape)
+library(enrichR)
+```
+
+## Importing 10x Datasets
+
+The 10X data was already processed with `CellRanger` and the coutns table was ready for us to import for the data analyses.
+We used the inbuilt function to import this data and to create a `Seurat` object as described below.
+
+```{r dataset, echo=FALSE}
+
+experiment_name = "BAP"
+dataset_loc <- "Z:/Documents/snRNAseq-placenta-project/expression-data"
+ids <- c("5pcO2_r1", "5pcO2_r2", "20pcO2_r1", "20pcO2_r2")
+# function d10x.data
+d10x.data <- sapply(ids, function(i){
+  d10x <- Read10X(file.path(dataset_loc,i,"filtered_feature_bc_matrix"))
+  colnames(d10x) <- paste(sapply(strsplit(colnames(d10x),split="-"), '[[' , 1L ), i, sep="-")
+  d10x
+})
+
+experiment.data <- do.call("cbind", d10x.data)
+bapd8.combined <- CreateSeuratObject(
+  experiment.data,
+  project = "BAPd8",
+  min.cells = 10,
+  min.genes = 200,
+  names.field = 2,
+  names.delim = "\\-")
+
+# backup the object
+bapd8.temp <- bapd8.combined
+
+```
+
+## Data quality insepction
+
+After the data was imported, we checked the quality of the data. Mitochondrial expression is an important criteria (along with other quantitative features of each nuclei) to decide if the nucleus is good or bad. We tested it as follows
+
+### MT ratio in nucleus
+
+```{r snrnaseqQC1, fig.width=8, fig.height=8, fig.cap= "Relationship between the total molecules detected (transcripts) vs. total genes detected across samples. Each nucleus is represented as a dot, with the color intensity representing the mitochondrial read ratio in that nucleus."}
+bapd8.combined$log10GenesPerUMI <- log10(bapd8.combined$nFeature_RNA) / log10(bapd8.combined$nCount_RNA)
+bapd8.combined$mitoRatio <- PercentageFeatureSet(object = bapd8.combined, pattern = "^MT-")
+bapd8.combined$mitoRatio <- bapd8.combined@meta.data$mitoRatio / 100
+metadata <- bapd8.combined@meta.data
+metadata$cells <- rownames(metadata)
+metadata <- metadata %>%
+  dplyr::rename(seq_folder = orig.ident,
+                nUMI = nCount_RNA,
+                nGene = nFeature_RNA, 
+                seq_folder = orig.ident)
+
+p <- ggplot(dat = metadata, aes(x=nUMI, y=nGene, color=mitoRatio)) + 
+  geom_point(alpha = 0.5) + 
+  scale_colour_gradient(low = "gray90", high = "black") + labs(colour="MT ratio") +
+  theme_bw(base_size = 12) +
+  theme(
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    strip.background = element_blank(),
+    panel.border = element_rect(colour = "black")) + 
+  xlab("RNA counts") + ylab("Gene counts") +
+  stat_smooth(method=lm) +
+  facet_wrap(~seq_folder, labeller = labeller(seq_folder = 
+                                                c("20pcO2_r1" = "20% Oxygen (rep1)",
+                                                  "20pcO2_r2" = "20% Oxygen (rep2)",
+                                                  "5pcO2_r1" = "5% Oxygen (rep1)",
+                                                  "5pcO2_r2" = "5% Oxygen (rep2)"))) +
+  scale_y_continuous(label=comma) +
+  scale_x_continuous(label=comma) 
+
+ggplotly(p)
+```
+
+### Number of nuclei per sample
+
+```{r snrnaseqQC2, fig.width=6, fig.height=4, fig.cap= "Number of nucleus found in each sample" }
+ggplot(metadata, aes(x=seq_folder, fill=seq_folder)) + 
+  geom_bar() +
+  theme_classic() +
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1)) +
+  theme(plot.title = element_text(hjust=0.5, face="bold")) +
+  ggtitle("Number of Nuclei")
+```
+
+### Density of nuclei per sample
+
+```{r snrnaseqQC3, fig.width=6, fig.height=4, fig.cap="Density of nucleus vs. UMIs"  }
+ggplot(metadata, aes(color=seq_folder, x=nUMI, fill= seq_folder)) + 
+  geom_density(alpha = 0.2) + 
+  scale_x_log10() + 
+  theme_classic() +
+  ylab("Cell density") +
+  geom_vline(xintercept = 500)
+```
+
+### Nubmer of Nuclei vs. genes
+
+```{r snrnaseqQC4, fig.width=6, fig.height=4, fig.cap="Nubmer of Nucleus vs. genes"}
+ggplot(metadata, aes(x=seq_folder, y=log10(nGene), fill=seq_folder)) + 
+  geom_boxplot() + 
+  theme_classic() +
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1)) +
+  theme(plot.title = element_text(hjust=0.5, face="bold")) +
+  ggtitle("NNuclei vs NGenes")
+```
+
+### Nubmer of Nuclei vs. genes
+
+```{r snrnaseqQC5, fig.width=6, fig.height=4, fig.cap="Nubmer of Nuclei vs. genes" }
+ggplot(metadata, aes(x=log10GenesPerUMI, color = seq_folder, fill=seq_folder)) +
+  geom_density(alpha = 0.2) +
+  theme_classic() +
+  geom_vline(xintercept = 0.8)
+```
+
+### Nubmer of Nuclei vs. genes
+
+```{r snrnaseqQC6, fig.width=6, fig.height=4 }
+ggplot(metadata, aes(color=seq_folder, x=mitoRatio, fill=seq_folder)) + 
+  geom_density(alpha = 0.2) + 
+  scale_x_log10() + 
+  theme_classic() +
+  geom_vline(xintercept = 0.2)
+```
+
+
+## Data filtering
+After inspection, we decided to remove all mitochondiral genes as well as ribosomal genes from our analyses.
+
+### set up the metadata file and organize
+
+```{r filtering1, fig.width=6, fig.height=4 }
+bapd8.combined <- bapd8.temp
+df <- bapd8.combined@meta.data
+df$replicate <- NA
+df$replicate[which(str_detect(df$orig.ident, "5pcO2"))] <- "5pcO2"
+df$replicate[which(str_detect(df$orig.ident, "20pcO2"))] <- "20pcO2"
+bapd8.combined@meta.data <- df
+bapd8.combined[["percent.mt"]] <- PercentageFeatureSet(bapd8.combined, pattern = "^MT-")
+datatable(bapd8.combined@meta.data, rownames = TRUE, filter="top", options = list(pageLength = 15, scrollX=T) )
+```
+
+### set up the metadata file and organize
+
+```{r filtering2, fig.width=8, fig.height=4.5 }
+v1 <- VlnPlot(bapd8.combined, features = "nFeature_RNA", pt.size = 1) + 
+  geom_hline(yintercept=200, color = "red", size=1) +
+  geom_hline(yintercept=7500, color = "red", size=1) +
+  theme(legend.position = "none")
+v2 <- VlnPlot(bapd8.combined, features = "nCount_RNA", pt.size = 1) +
+  theme(legend.position = "none")
+v3 <- VlnPlot(bapd8.combined, features = "percent.mt", pt.size = 1) +
+  geom_hline(yintercept=15, color = "red", size=1) +
+  theme(legend.position = "none")
+v1 | v2 | v3
+```
+
+### Before filtering
+
+```{r filtering3, fig.width=10, fig.height=5 }
+B1 <- FeatureScatter(bapd8.combined, feature1 = "nCount_RNA", feature2 = "percent.mt")
+B2 <- FeatureScatter(bapd8.combined, feature1 = "nCount_RNA", feature2 = "nFeature_RNA")
+B1 | B2
+```
+
+### Preliminary filtering
+
+
+```{r filtering4, fig.width=10, fig.height=5 }
+bapd8.combined <- subset(bapd8.combined, subset = nFeature_RNA > 200 & nFeature_RNA < 7500 & percent.mt < 25)
+I1 <- FeatureScatter(bapd8.combined, feature1 = "nCount_RNA", feature2 = "percent.mt")
+I2 <- FeatureScatter(bapd8.combined, feature1 = "nCount_RNA", feature2 = "nFeature_RNA")
+
+I1 | I2
+```
+
+### Final filtering
+
+```{r filtering5, fig.width=10, fig.height=5 }
+bapd8.combined <- subset(bapd8.combined, subset = nFeature_RNA > 200 & nFeature_RNA < 7500 & percent.mt < 15)
+A1 <- FeatureScatter(bapd8.combined, feature1 = "nCount_RNA", feature2 = "percent.mt")
+A2 <- FeatureScatter(bapd8.combined, feature1 = "nCount_RNA", feature2 = "nFeature_RNA")
+A1 | A2
+```
+
+### Removing ribosomal and MT proteins
+
+```{r filtering6, fig.width=8, fig.height=6 }
+counts <- GetAssayData(object = bapd8.combined, slot = "counts")
+counts <- counts[grep(pattern = "^MT", x = rownames(counts), invert = TRUE),]
+counts <- counts[grep(pattern = "^MT", x = rownames(counts), invert = TRUE),]
+counts <- counts[grep(pattern = "^RPL", x = rownames(counts), invert = TRUE),]
+counts <- counts[grep(pattern = "^RPS", x = rownames(counts), invert = TRUE),]
+counts <- counts[grep(pattern = "^MRPS", x = rownames(counts), invert = TRUE),]
+counts <- counts[grep(pattern = "^MRPL", x = rownames(counts), invert = TRUE),]
+keep_genes <- Matrix::rowSums(counts) >= 10
+filtered_counts <- counts[keep_genes, ]
+bapd8.fcombined <- CreateSeuratObject(filtered_counts, meta.data = bapd8.combined@meta.data)
+bapd8.fcombined@meta.data <- bapd8.fcombined@meta.data[1:4]
+bapd8.combined <- bapd8.fcombined
+```
+
+## Data integration and Clustering
+
+`Seurat` package was used for integrating samples and running the snRNAseq analyses.
+
+
+### data integration
+
+```{r split}
+bapd8.list <- SplitObject(bapd8.combined, split.by = "orig.ident")
+bapd8.list <- lapply(X = bapd8.list, FUN = function(x) {
+  x <- NormalizeData(x)
+  x <- FindVariableFeatures(x, selection.method = "vst", nfeatures = 2000)
+})
+```
+
+### Seurat
+
+```{r seurat}
+bapd8.anchors <- FindIntegrationAnchors(object.list = bapd8.list, dims = 1:20)
+bapd8.integrated <- IntegrateData(anchorset = bapd8.anchors, dims = 1:20)
+DefaultAssay(bapd8.integrated) <- "integrated"
+bapd8.integrated <- ScaleData(bapd8.integrated, verbose = FALSE)
+bapd8.integrated <- RunPCA(bapd8.integrated, npcs = 30, verbose = FALSE)
+bapd8.integrated <- RunUMAP(bapd8.integrated, reduction = "pca", dims = 1:20)
+bapd8.integrated <- FindNeighbors(bapd8.integrated, reduction = "pca", dims = 1:20)
+bapd8.integrated <- FindClusters(bapd8.integrated, resolution = 0.5)
+```
+
+### renumber the clusters
+
+By default `Seurat` assigns the cluster identity starting from zero. Since we prefer identity starting from one, we renumbered cluster 0-8 to 1-9.
+
+```{r renumber}
+num.clusters <- nlevels(bapd8.integrated$seurat_clusters)
+df <- bapd8.integrated@meta.data
+df$new_clusters <- as.factor(as.numeric(df$seurat_clusters))
+bapd8.integrated@meta.data <- df
+Idents(bapd8.integrated) <- "new_clusters"
+```
+
+### dimplots (colored based on clusters)
+
+The Dimensional reduction plot was plotted using the `Seurat` `DipPlot` function, with colors representing different groups/clusters.
+
+
+```{r dimplot1, fig.width=6, fig.height=6, fig.cap="Fig2A: Dimensional reduction plot showing 5,355 nuclei plotted in two dimensions. The colored dots represent individual nuclei and are assigned based on cluster identity" }
+d1 <- enhancedDimPlot(object = bapd8.integrated, grouping_var = 'ident', reduction = "umap", label = TRUE, pt.size = 1, alpha = 0.5) +
+  ggtitle("A") + xlab("UMAP_1") + ylab("UMAP_2") +
+  theme_classic() +
+  theme(legend.position = "none", plot.title = element_text(face = "bold"))
+ggplotly(d1)
+```
+
+### dimplots (colored based on conditions)
+
+```{r dimplot2, fig.width=8, fig.height=6, fig.cap="Fig2B: Dimensional reduction plot showing 5,355 nuclei plotted in two dimensions. The colored dots represent individual nuclei and are assigned based on treatment." }
+d2 <- enhancedDimPlot(object = bapd8.integrated, grouping_var = 'replicate', reduction = "umap", label = FALSE, pt.size = 1, alpha = 0.4) +
+  ggtitle("B") +
+  xlab("UMAP_1") +
+  ylab("UMAP_2") +
+  theme_classic() + 
+  theme(legend.justification = c(1, 1), legend.position = c(1, 1), plot.title = element_text(face = "bold")) +
+  scale_colour_manual(name = "Conditions", 
+                      labels = c(expression(paste('20% ', 'O'[2])), expression(paste('5% ', 'O'[2]))), 
+                      values = c("20pcO2" = "#0571b0", "5pcO2" = "#ca0020")) +
+  scale_fill_manual(name = "Conditions", 
+                    labels = c(expression(paste('20% ', 'O'[2])), expression(paste('5% ', 'O'[2]))), 
+                    values = c("20pcO2" = "#0571b0", "5pcO2" = "#ca0020")) +
+  scale_linetype_manual(values = "blank")
+ggplotly(d2)
+```
+
+### dimplots (colored based on samples)
+
+```{r dimplot3, fig.width=8, fig.height=6, fig.cap="Fig2C: Dimensional reduction plot showing 5,355 nuclei plotted in two dimensions. The colored dots represent individual nuclei and are assigned based on replicate"}
+
+d3 <- enhancedDimPlot(object = bapd8.integrated, grouping_var = 'orig.ident', reduction = "umap", label = FALSE, pt.size = 1, alpha = 0.4) +
+  ggtitle("C") +
+  xlab("UMAP_1") +
+  ylab("UMAP_2") +
+  theme_classic() + 
+  theme(legend.justification = c(1, 1), legend.position = c(1, 1), plot.title = element_text(face = "bold")) +
+  scale_colour_manual(name = "Replicates", 
+                      labels = c(expression(paste('20% ', 'O'[2], ' rep1')), expression(paste('20% ', 'O'[2], ' rep2')), expression(paste('5% ', 'O'[2], ' rep1')), expression(paste('5% ', 'O'[2], ' rep1'))), 
+                      values = c("20pcO2_r1" = "#0571b0", "20pcO2_r2" = "#92c5de", "5pcO2_r1" = "#ca0020", "5pcO2_r2" = "#f4a582")) +
+  scale_fill_manual(name = "Replicates", 
+                    labels = c(expression(paste('20% ', 'O'[2], ' rep1')), expression(paste('20% ', 'O'[2], ' rep2')), expression(paste('5% ', 'O'[2], ' rep1')), expression(paste('5% ', 'O'[2], ' rep1'))), 
+                    values = c("20pcO2_r1" = "#0571b0", "20pcO2_r2" = "#92c5de", "5pcO2_r1" = "#ca0020", "5pcO2_r2" = "#f4a582")) +
+  scale_linetype_manual(values = "blank")
+
+ggplotly(d3)
+```
+
+## Find markers
+
+Find markers for each cluster. The `Seurat` command `FindMarkers` was run using the cluster identity assigned in the previous step. Additional column with the Fold  (converted from natural log fold change of seurat output) was added to the table. The filtering was done for genes with `avg_FC`  >= 1.5 and `p_val_adj` <= 0.05.
+
+```{r findmarkers}
+DefaultAssay(bapd8.integrated) <- "RNA"
+lhs.a  <- paste("markers.all.", 1:num.clusters, sep="")
+rhs.a <- paste("FindMarkers(bapd8.integrated, ident.1 = ",1:num.clusters," )", sep="")
+commands.a <- paste(paste(lhs.a, rhs.a, sep="<-"), collapse=";")
+eval(parse(text=commands.a))
+lhs.b  <- paste("markers.all.", 1:num.clusters, "$avg_FC", sep="")
+rhs.b <- paste("exp(markers.all.",1:num.clusters,"$avg_logFC)", sep="")
+commands.b <- paste(paste(lhs.b, rhs.b, sep="<-"), collapse=";")
+eval(parse(text=commands.b))
+lhs.c  <- paste("markers.filtered.", 1:num.clusters, sep="")
+rhs.c <- paste("markers.all.",1:num.clusters," %>% filter(avg_FC >= 1.5) %>% filter(p_val_adj <= 0.05) %>% arrange(desc(avg_FC))", sep="")
+commands.c <- paste(paste(lhs.c, rhs.c, sep="<-"), collapse=";")
+eval(parse(text=commands.c))
+lhs.d  <- paste("markers.filtered.names.", 1:num.clusters, sep="")
+rhs.d <- paste("rownames(markers.filtered.",1:num.clusters,")", sep="")
+commands.d <- paste(paste(lhs.d, rhs.d, sep="<-"), collapse=";")
+eval(parse(text=commands.d))
+```
+
+### Check the number of markers
+
+```{r num.of.markers}
+message (paste("Cluster 1 as", length(markers.filtered.names.1), "markers", sep = " "))
+message (paste("Cluster 2 as", length(markers.filtered.names.2), "markers", sep = " "))
+message (paste("Cluster 3 as", length(markers.filtered.names.3), "markers", sep = " "))
+message (paste("Cluster 4 as", length(markers.filtered.names.4), "markers", sep = " "))
+message (paste("Cluster 5 as", length(markers.filtered.names.5), "markers", sep = " "))
+message (paste("Cluster 6 as", length(markers.filtered.names.6), "markers", sep = " "))
+message (paste("Cluster 7 as", length(markers.filtered.names.7), "markers", sep = " "))
+message (paste("Cluster 8 as", length(markers.filtered.names.8), "markers", sep = " "))
+message (paste("Cluster 9 as", length(markers.filtered.names.9), "markers", sep = " "))
+```
+
+
+## Marker plots
+
+Combined expression of all the markers genes in various clusters. The markers have higher expression in their respecitve cluster than compared to rest of the clusters.
+
+
+```{r definecolors}
+ggplotColours <- function(n = 6, h = c(0, 360) + 15){
+  if ((diff(h) %% 360) < 1) h[2] <- h[2] - 360/n
+  hcl(h = (seq(h[1], h[2], length = n)), c = 100, l = 65)
+}
+
+color_list <- ggplotColours(n=9)
+
+grouped_violinPlots <- function(markersfile, clusternumber, seuratobject = bapd8.integrated) {
+  dittoPlotVarsAcrossGroups(seuratobject, markersfile, 
+                            group.by = "new_clusters", main = paste("Cluster ", clusternumber, " markers"), 
+                            xlab = "Clusters", 
+                            ylab = "Mean z-score expression", 
+                            x.labels = c("Cluster 1", "Cluster 2", "Cluster 3", "Cluster 4",
+                                         "Cluster 5", "Cluster 6", "Cluster 7", "Cluster 8", "Cluster 9"), 
+                            vlnplot.lineweight = 0.5, 
+                            legend.show = FALSE, 
+                            jitter.size = 0.5, 
+                            color.panel = color_list)
+}
+```
+
+### Markers of cluster 1
+
+```{r cluster1, fig.width=6, fig.height=4 }
+grouped_violinPlots(markers.filtered.names.1, 1)
+```
+
+### Markers of cluster 2
+
+```{r cluster2, fig.width=6, fig.height=4 }
+grouped_violinPlots(markers.filtered.names.2, 2)
+```
+
+### Markers of cluster 3
+
+```{r cluster3, fig.width=6, fig.height=4 }
+grouped_violinPlots(markers.filtered.names.3, 3)
+```
+
+### Markers of cluster 4
+
+```{r cluster4, fig.width=6, fig.height=4 }
+grouped_violinPlots(markers.filtered.names.4, 4)
+```
+
+### Markers of cluster 5
+
+```{r cluster5, fig.width=6, fig.height=4 }
+grouped_violinPlots(markers.filtered.names.5, 5)
+```
+
+### Markers of cluster 6
+
+```{r cluster6, fig.width=6, fig.height=4 }
+grouped_violinPlots(markers.filtered.names.6, 6)
+```
+
+### Markers of cluster 7
+
+```{r cluster7, fig.width=6, fig.height=4 }
+grouped_violinPlots(markers.filtered.names.7, 7)
+```
+
+### Markers of cluster 8
+
+```{r cluster8, fig.width=6, fig.height=4 }
+grouped_violinPlots(markers.filtered.names.8, 8)
+```
+
+### Markers of cluster 9
+
+```{r cluster9, fig.width=6, fig.height=4 }
+grouped_violinPlots(markers.filtered.names.9, 9)
+```
+
+
+## Run PlacentaCellEnrich on markers
+
+[`PlacentaCellEnrich`](https://www.sciencedirect.com/science/article/abs/pii/S0143400420304264) was run command-line using the [`TissueEnrich`](https://bioconductor.org/packages/release/bioc/html/TissueEnrich.html) R package. We used this to assign cell identity to cluster 2, 3, 5 and 6. 
+The function used for running PCE is as follows:
+
+```{r runPCE}
+l <- load(file = "~/TutejaLab/PlacentaEnrich/combine-test-expression1.Rdata")
+humanGeneMapping <- dataset$GRCH38$humanGeneMapping
+d <- dataset$PlacentaDeciduaBloodData
+data <- d$expressionData
+cellDetails <- d$cellDetails
+
+runpce <- function(inputgenelist, clusternumber) {
+  inputGenes<-toupper(inputgenelist)
+  humanGene<-humanGeneMapping[humanGeneMapping$Gene.name %in% inputGenes,]
+  inputGenes<-humanGene$Gene
+  expressionData<-data[intersect(row.names(data),humanGeneMapping$Gene),]
+  se<-SummarizedExperiment(assays = SimpleList(as.matrix(expressionData)),rowData = row.names(expressionData),colData = colnames(expressionData))
+  cellSpecificGenesExp<-teGeneRetrieval(se,expressedGeneThreshold = 1)
+  se<-SummarizedExperiment(assays = SimpleList(as.matrix(expressionData)),rowData = row.names(expressionData),colData = colnames(expressionData))
+  cellSpecificGenesExp<-teGeneRetrieval(se,expressedGeneThreshold = 1)
+  print(length(inputGenes))
+  gs<-GeneSet(geneIds=toupper(inputGenes))
+  output2<-teEnrichmentCustom(gs,cellSpecificGenesExp)
+  enrichmentOutput<-setNames(data.frame(assay(output2[[1]]),row.names = rowData(output2[[1]])[,1]),colData(output2[[1]])[,1])
+  row.names(cellDetails)<-cellDetails$RName
+  enrichmentOutput$Tissue<- cellDetails[row.names(enrichmentOutput),"CellName"]
+  ggplot(data = enrichmentOutput, mapping = aes(x = reorder (Tissue, -Log10PValue), Log10PValue, fill= Tissue)) +
+    geom_bar(stat = "identity") + theme_minimal() + 
+    theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1, size = 12),
+          axis.text.y = element_text(size = 12),
+          plot.margin = margin(10, 10, 10, 100), legend.position = "none",
+          plot.title = element_text(color = "black", size=18, face="bold.italic"),
+          axis.title.x = element_blank(),
+          axis.title.y = element_text(color="black", size=14, face="bold")) +
+    scale_y_continuous(expand = expansion(mult = c(0, .1))) +
+    ggtitle(paste("Cluster ", clusternumber )) + ylab("-log10 p-value")
+}
+```
+
+### PCE for cluster 1 markers
+
+```{r runPCE1, fig.width=8, fig.height=6 }
+runpce(markers.filtered.names.1, 1)
+```
+
+### PCE for cluster 2 markers
+
+```{r runPCE2, fig.width=8, fig.height=6 }
+runpce(markers.filtered.names.2, 2)
+```
+
+### PCE for cluster 3 markers
+
+```{r runPCE3, fig.width=8, fig.height=6 }
+runpce(markers.filtered.names.3, 3)
+```
+
+### PCE for cluster 4 markers
+
+```{r runPCE4, fig.width=8, fig.height=6 }
+runpce(markers.filtered.names.4, 4)
+```
+
+### PCE for cluster 5 markers
+
+```{r runPCE5, fig.width=8, fig.height=6 }
+runpce(markers.filtered.names.5, 5)
+```
+
+### PCE for cluster 6 markers
+
+```{r runPCE6, fig.width=8, fig.height=6 }
+runpce(markers.filtered.names.6, 6)
+```
+
+### PCE for cluster 7 markers
+
+```{r runPCE7, fig.width=8, fig.height=6 }
+runpce(markers.filtered.names.7, 7)
+```
+
+### PCE for cluster 8 markers
+
+```{r runPCE8, fig.width=8, fig.height=6 }
+runpce(markers.filtered.names.8, 8)
+```
+
+### PCE for cluster 9 markers
+
+```{r runPCE9, fig.width=8, fig.height=6 }
+runpce(markers.filtered.names.9, 9)
+```
+
+
+## Plotting functions
+
+Some plotting functions that we used for finalizing violin plots.
+
+```{r vln.mod}
+# https://divingintogeneticsandgenomics.rbind.io/post/stacked-violin-plot-for-visualizing-single-cell-data-in-seurat/
+modify_vlnplot<- function(obj, 
+                          feature, 
+                          pt.size = 0, 
+                          plot.margin = unit(c(-0.75, 0, -0.75, 0), "cm"),
+                          ...) {
+  p<- VlnPlot(obj, features = feature, pt.size = pt.size, ... )  + 
+    xlab("") + ylab(feature) + ggtitle("") + 
+    theme(legend.position = "none", 
+          axis.text.x = element_blank(), 
+          axis.ticks.x = element_blank(), 
+          axis.title.y = element_text(size = rel(1), angle = 0), 
+          axis.text.y = element_text(size = rel(1)), 
+          plot.margin = plot.margin ) 
+  return(p)
+}
+
+extract_max<- function(p){
+  ymax<- max(ggplot_build(p)$layout$panel_scales_y[[1]]$range$range)
+  return(ceiling(ymax))
+}
+
+
+StackedVlnPlot<- function(obj, features,
+                          pt.size = 0, 
+                          plot.margin = unit(c(-0.75, 0, -0.75, 0), "cm"),
+                          ...) {
+  
+  plot_list<- purrr::map(features, function(x) modify_vlnplot(obj = obj,feature = x, ...))
+  
+  # Add back x-axis title to bottom plot. patchwork is going to support this?
+  plot_list[[length(plot_list)]]<- plot_list[[length(plot_list)]] +
+    theme(axis.text.x=element_text(), axis.ticks.x = element_line())
+  
+  # change the y-axis tick to only max value 
+  ymaxs<- purrr::map_dbl(plot_list, extract_max)
+  plot_list<- purrr::map2(plot_list, ymaxs, function(x,y) x + 
+                            scale_y_continuous(breaks = c(y)) + 
+                            expand_limits(y = y))
+  
+  p<- patchwork::wrap_plots(plotlist = plot_list, ncol = 1)
+  return(p)
+}
+```
+
+
+### Find all Markers
+
+Find all markers using the in build function of `Seurat`
+
+
+```{r findallmarkers}
+bapd8.markers <- FindAllMarkers(bapd8.integrated, only.pos = TRUE, min.pct = 0.25, logfc.threshold = 0.25)
+bapd8.markers.ranked.10.percluster <- bapd8.markers %>% group_by(cluster) %>% top_n(n = 10, wt = avg_logFC)
+datatable(bapd8.markers.ranked.10.percluster, rownames = FALSE, filter="top", options = list(pageLength = 10, scrollX=T))
+```
+
+
+### Find Conserved markers
+
+This is optional. We did not use the marker genes specific for clusters of each condition.
+
+```{r findconditionmarkers}
+lhs.f  <- paste("markers.conserved.", 1:num.clusters, sep="")
+rhs.f <- paste("FindConservedMarkers(bapd8.integrated, ident.1 = ",1:num.clusters,', grouping.var = "replicate", verbose = FALSE)', sep="")
+commands.f <- paste(paste(lhs.f, rhs.f, sep="<-"), collapse=";")
+eval(parse(text=commands.f))
+```
+
+
+### Expression tables
+
+To export average expression levels for all genes, summarized based on all cells, each condition and each replicate, we used `AverageExpression` command for `Seurat`.
+
+```{r exp.table}
+cluster.averages.data <- AverageExpression(bapd8.integrated, slot = "data", assays = "RNA")
+condition.averages.data <- AverageExpression(bapd8.integrated, slot = "data", add.ident = "orig.ident", assays = "RNA")
+replicate.averages.data <- AverageExpression(bapd8.integrated, slot = "data", add.ident = "replicate", assays = "RNA")
+avg.data <- cluster.averages.data[["RNA"]]
+avg.condition <- condition.averages.data[["RNA"]]
+avg.replicate <- replicate.averages.data[["RNA"]]
+write.table(avg.data, file="snn-average-data.tsv", sep= "\t")
+write.table(avg.condition, file="snn-average-condition.tsv", sep= "\t")
+write.table(avg.replicate, file="snn-average-replicate.tsv", sep= "\t")
+avg.data$gene <- row.names(avg.data)
+avg.data <- as_data_frame(avg.data)
+avg.data <- avg.data[, c(10, 1, 2, 3, 4, 5, 6, 7, 8, 9)]
+colnames(avg.data) <- c("Gene", paste("Cluster", colnames(avg.data[2:10]), sep = "_"))
+datatable(avg.data, rownames = FALSE, filter="top", options = list(pageLength = 10, scrollX=T))
+```
+
+### Cell numbers per clusters
+
+Generate a summary table showing the number of cells in each cluster, broken down by replicates and treatment.
+
+```{r clusterstats, fig.width=8, fig.height=5 }
+cells <- bapd8.integrated@meta.data	%>%
+  dplyr::group_by(orig.ident,	new_clusters, replicate)	%>%	
+  dplyr::summarise(length(new_clusters)) %>%
+  dplyr::rename(sample = orig.ident,
+                cluster = new_clusters,
+                condition = replicate,
+                number.of.cells = `length(new_clusters)`)
+
+#head(cells)
+#datatable(cells, rownames = TRUE, filter="top", options = list(pageLength = 10, scrollX=T))
+#cells %>% 
+ # group_by(orig.ident, new_clusters ) %>%
+ # summarize(`length(new_clusters)`)
+
+ggplot(cells, aes(x = cluster, y = number.of.cells, fill = cluster )) +
+  geom_col() +
+  facet_wrap(~condition) +
+  theme_classic() +
+  theme(legend.position = "none")
+```
+
+
+## DE between conditions
+
+The DE was carried out between the conditions for each cluster. First we modified the metadata to create a separate column that has both the condition as well as the cluster number and then we use the `Seurat`'s `FindMarkers` to find the genes that are differentially expressed. The genes that have log2FC > 1 or <-1 are shown in color if they alos have p-val <0.05.
+
+```{r de}
+head(bapd8.integrated@meta.data)
+df <- bapd8.integrated@meta.data
+df$stim <- (paste(df$replicate,df$new_clusters, sep = "."))
+df$stim <- gsub('5pcO2', 'FIVE', df$stim)
+df$stim <- gsub('20pcO2', 'TWENTY', df$stim)
+bapd8.integrated@meta.data <- df
+Idents(bapd8.integrated) <- "stim"
+lhs.g  <- paste("clus", 1:num.clusters, ".five.twenty", sep="")
+rhs.g <- paste('FindMarkers(bapd8.integrated, ident.1 = "FIVE.', 1:num.clusters, '", ident.2 = "TWENTY.', 1:num.clusters, '", verbose = FALSE, logfc.threshold = 0)', sep="")
+commands.g <- paste(paste(lhs.g, rhs.g, sep="<-"), collapse=";")
+eval(parse(text=commands.g))
+lhs.h  <- paste("clus", 1:num.clusters, ".five.twenty$log2fc", sep="")
+rhs.h <- paste('log2(exp(clus', 1:num.clusters, '.five.twenty$avg_logFC))', sep="")
+commands.h <- paste(paste(lhs.h, rhs.h, sep="<-"), collapse=";")
+eval(parse(text=commands.h))
+lhs.j  <- paste("clus", 1:num.clusters, ".five.twenty$Gene", sep="")
+rhs.j <- paste('row.names(clus', 1:num.clusters, '.five.twenty)', sep="")
+commands.j <- paste(paste(lhs.j, rhs.j, sep="<-"), collapse=";")
+eval(parse(text=commands.j))
+lhs.k  <- paste("clus", 1:num.clusters, '.five.twenty$diffexpressed <- "other genes"', sep="")
+commands.k <- paste(lhs.k , sep=";")
+eval(parse(text=commands.k))
+lhs.l  <- paste('clus', 1:num.clusters,'.five.twenty$diffexpressed[clus',1:num.clusters,'.five.twenty$log2fc >= 1 & clus', 1:num.clusters,'.five.twenty$p_val < 0.05] <- "up in 20% O2"', sep="")
+commands.l <- paste(lhs.l , sep=";")
+eval(parse(text=commands.l))
+lhs.m  <- paste('clus', 1:num.clusters,'.five.twenty$diffexpressed[clus',1:num.clusters,'.five.twenty$log2fc <= -1 & clus', 1:num.clusters,'.five.twenty$p_val < 0.05] <- "up in 5% O2"', sep="")
+commands.m <- paste(lhs.m , sep=";")
+eval(parse(text=commands.m))
+lhs.n  <- paste('clus', 1:num.clusters,'.five.twenty$delabel <- ""', sep="")
+commands.n <- paste(lhs.n , sep=";")
+eval(parse(text=commands.n))
+lhs.o  <- paste('clus', 1:num.clusters,'.five.twenty$delabel[clus', 1:num.clusters,'.five.twenty$log2fc >= 1 & clus', 1:num.clusters,'.five.twenty$p_val < 0.05]', sep="")
+rhs.o  <- paste('clus', 1:num.clusters,'.five.twenty$Gene[clus', 1:num.clusters,'.five.twenty$log2fc >= 1 & clus', 1:num.clusters,'.five.twenty$p_val < 0.05]', sep="")
+commands.o <- paste(paste(lhs.o, rhs.o, sep="<-"), collapse=";")
+eval(parse(text=commands.o))
+lhs.p  <- paste('clus', 1:num.clusters,'.five.twenty$delabel[clus', 1:num.clusters,'.five.twenty$log2fc < -1 & clus', 1:num.clusters,'.five.twenty$p_val < 0.05]', sep="") 
+rhs.p  <- paste('clus', 1:num.clusters,'.five.twenty$Gene[clus', 1:num.clusters,'.five.twenty$log2fc < -1 & clus', 1:num.clusters,'.five.twenty$p_val < 0.05]', sep="")
+commands.p <- paste(paste(lhs.p, rhs.p, sep="<-"), collapse=";")
+eval(parse(text=commands.p))
+```
+
+### Volcano Plot function
+
+This plots allows us to visualize the genes that are overexpressed in each condition along with its p-value. First, we will setup a function to make a volcano plot and then we call them for each cluster and depict them as an interactive plot.
+
+```{r volcano, fig.width=8, fig.height=6 }
+
+myVolcanoPlot <- function(mydf, clus.number) {
+de <- ggplot(data=mydf, aes(x=log2fc, y=-log10(p_val), col=diffexpressed, label=delabel)) +
+  geom_point(alpha = 0.5) +
+  theme_classic() +
+  scale_color_manual(name = "Expression", values=c("#4d4d4d", "#ca0020", "#0571b0")) +
+  ggtitle(paste("Cluster ", clus.number, ": 20% O2 vs. 5% O2")) +
+  xlab("Log2 fold change") +
+  ylab("-log10 pvalue") +
+  theme(legend.text.align = 0)
+return(de)
+}
+```
+
+
+### Volcano plot for cluster 1
+
+```{r de.clus1, fig.width=8, fig.height=6, fig.cap="Fig.6-1: Interactive Volcano plot showing genes overexpressed in 5% and 20% oxygen conditions for cluster 1" }
+ggplotly(myVolcanoPlot(clus1.five.twenty, 1))
+```
+
+### Volcano plot for cluster 2
+
+```{r de.clus2, fig.width=8, fig.height=6, fig.cap="Fig.6-2: Interactive Volcano plot showing genes overexpressed in 5% and 20% oxygen conditions for cluster 2" }
+ggplotly(myVolcanoPlot(clus2.five.twenty, 2))
+```
+
+### Volcano plot for cluster 3
+
+```{r de.clus3, fig.width=8, fig.height=6, fig.cap="Fig.6-3: Interactive Volcano plot showing genes overexpressed in 5% and 20% oxygen conditions for cluster 3" }
+ggplotly(myVolcanoPlot(clus3.five.twenty, 3))
+```
+### Volcano plot for cluster 4
+
+```{r de.clus4, fig.width=8, fig.height=6, fig.cap="Fig.6-4: Interactive Volcano plot showing genes overexpressed in 5% and 20% oxygen conditions for cluster 4" }
+ggplotly(myVolcanoPlot(clus4.five.twenty, 4))
+```
+### Volcano plot for cluster 5
+
+```{r de.clus5, fig.width=8, fig.height=6, fig.cap="Fig.6-5: Interactive Volcano plot showing genes overexpressed in 5% and 20% oxygen conditions for cluster 5" }
+ggplotly(myVolcanoPlot(clus5.five.twenty, 5))
+```
+### Volcano plot for cluster 6
+
+```{r de.clus6, fig.width=8, fig.height=6, fig.cap="Fig.6-6: Interactive Volcano plot showing genes overexpressed in 5% and 20% oxygen conditions for cluster 6" }
+ggplotly(myVolcanoPlot(clus6.five.twenty, 6))
+```
+### Volcano plot for cluster 7
+
+```{r de.clus7, fig.width=8, fig.height=6, fig.cap="Fig.6-7: Interactive Volcano plot showing genes overexpressed in 5% and 20% oxygen conditions for cluster 7" }
+ggplotly(myVolcanoPlot(clus7.five.twenty, 7))
+```
+### Volcano plot for cluster 8
+
+```{r de.clus8, fig.width=8, fig.height=6, fig.cap="Fig.6-8: Interactive Volcano plot showing genes overexpressed in 5% and 20% oxygen conditions for cluster 8" } 
+ggplotly(myVolcanoPlot(clus8.five.twenty, 8))
+```
+### Volcano plot for cluster 9
+
+```{r de.clus9, fig.width=8, fig.height=6, fig.cap="Fig.6-9: Interactive Volcano plot showing genes overexpressed in 5% and 20% oxygen conditions for cluster 9"}
+ggplotly(myVolcanoPlot(clus9.five.twenty, 9))
+```
+
+
+
+
+## Figures for publication
+
+Prepare dataset for individual plots
+
+```{r dataprep, fig.width=8, fig.height=6 }
+DefaultAssay(bapd8.integrated) <- "RNA"
+Idents(bapd8.integrated) <- "new_clusters"
+cluster5n6 <- subset(bapd8.integrated, idents = c("5", "6"))
+cluster2356 <- subset(bapd8.integrated, idents = c("2", "3", "5", "6"))
+cluster2n3 <- subset(bapd8.integrated, idents = c("2", "3"))
+Idents(cluster5n6) <- "new_clusters"
+Idents(cluster2356) <- "new_clusters"
+Idents(cluster2n3) <- "new_clusters"
+DefaultAssay(cluster2356) <- "RNA"
+DefaultAssay(cluster5n6) <- "RNA"
+DefaultAssay(cluster2n3) <- "RNA"
+```
+
+### Figure 3
+
+Transcription factors
+
+```{r fig3a, fig.width=7, fig.height=3, fig.cap="Fig3A: Violin plots showing expression (average log fold change) for genes encoding transcription factors" }
+fig3a <- c("GATA3", "TFAP2A")
+multi_dittoPlot(bapd8.integrated, vars = fig3a, group.by = "new_clusters",
+                       vlnplot.lineweight = 0.2, jitter.size = 0.3, ncol = 2, color.panel = color_list)
+```
+
+Structural proteins
+
+```{r fig3b, fig.width=7, fig.height=3, fig.cap="Fig3B: Violin plots showing expression (average log fold change) for genes encoding Structural proteins" }
+fig3b <- c("KRT7", "KRT23")
+multi_dittoPlot(bapd8.integrated, vars = fig3b, group.by = "new_clusters",
+                       vlnplot.lineweight = 0.2, jitter.size = 0.3, ncol = 2, color.panel = color_list)
+```
+
+Hormones
+
+```{r fig3c, fig.width=7, fig.height=3, fig.cap="Fig3C: Violin plots showing expression (average log fold change) for genes encoding Hormones" }
+fig3c <- c("CGA", "PGF")
+multi_dittoPlot(bapd8.integrated, vars = fig3c, group.by = "new_clusters",
+                       vlnplot.lineweight = 0.2, jitter.size = 0.3, ncol = 2, color.panel = color_list)
+```
+
+Transporters and Carcinoembryonic Antigen
+
+```{r fig3d, fig.width=7, fig.height=3, fig.cap="Fig3D: Violin plots showing expression (average log fold change) for genes encoding Transporters and Carcinoembryonic Antigen" }
+fig3d <- c("SLC40A1", "XAGE2")
+multi_dittoPlot(bapd8.integrated, vars = fig3d, group.by = "new_clusters",
+                       vlnplot.lineweight = 0.2, jitter.size = 0.3, ncol = 2, color.panel = color_list)
+```
+
+Enzymes
+
+```{r fig3e, fig.width=7, fig.height=3, fig.cap="Fig3E: Violin plots showing expression (average log fold change) for genes encoding enzymes" }
+fig3e <- c("CYP11A1", "HSD3B1")
+multi_dittoPlot(bapd8.integrated, vars = fig3e, group.by = "new_clusters",
+                       vlnplot.lineweight = 0.2, jitter.size = 0.3, ncol = 2, color.panel = color_list)
+```
+
+Long non-coding RNAs
+
+```{r fig3f, fig.width=7, fig.height=3, fig.cap="Fig3F: Violin plots showing expression (average log fold change) for genes encoding lncRNAs" }
+fig3f <- c("MALAT1", "NEAT1")
+multi_dittoPlot(bapd8.integrated, vars = fig3f, group.by = "new_clusters",
+                       vlnplot.lineweight = 0.2, jitter.size = 0.3, ncol = 2, color.panel = color_list)
+```
+
+### Figure 5
+
+```{r fig5}
+inputGenes<-toupper(markers.filtered.names.5)
+humanGene<-humanGeneMapping[humanGeneMapping$Gene.name %in% inputGenes,]
+inputGenes<-humanGene$Gene
+expressionData<-data[intersect(row.names(data),humanGeneMapping$Gene),]
+se<-SummarizedExperiment(assays = SimpleList(as.matrix(expressionData)),rowData = row.names(expressionData),colData = colnames(expressionData))
+cellSpecificGenesExp<-teGeneRetrieval(se,expressedGeneThreshold = 1)
+se<-SummarizedExperiment(assays = SimpleList(as.matrix(expressionData)),rowData = row.names(expressionData),colData = colnames(expressionData))
+cellSpecificGenesExp<-teGeneRetrieval(se,expressedGeneThreshold = 1)
+print(length(inputGenes))
+gs<-GeneSet(geneIds=toupper(inputGenes))
+output2<-teEnrichmentCustom(gs,cellSpecificGenesExp)
+enrichmentOutput<-setNames(data.frame(assay(output2[[1]]),row.names = rowData(output2[[1]])[,1]),colData(output2[[1]])[,1])
+row.names(cellDetails)<-cellDetails$RName
+enrichmentOutput$Tissue<- cellDetails[row.names(enrichmentOutput),"CellName"]
+sct.cluster5.genes <- as.data.frame(assay(output2[[2]][["SCT"]]))[1]
+sct.cluster5.genes <- humanGeneMapping[humanGeneMapping$Gene %in% as.list(sct.cluster5.genes$Gene),]
+sct.cluster5.genes <- sct.cluster5.genes$Gene.name
+# PCE cluster 6
+inputGenes<-toupper(markers.filtered.names.6)
+humanGene<-humanGeneMapping[humanGeneMapping$Gene.name %in% inputGenes,]
+inputGenes<-humanGene$Gene
+expressionData<-data[intersect(row.names(data),humanGeneMapping$Gene),]
+se<-SummarizedExperiment(assays = SimpleList(as.matrix(expressionData)),rowData = row.names(expressionData),colData = colnames(expressionData))
+cellSpecificGenesExp<-teGeneRetrieval(se,expressedGeneThreshold = 1)
+se<-SummarizedExperiment(assays = SimpleList(as.matrix(expressionData)),rowData = row.names(expressionData),colData = colnames(expressionData))
+cellSpecificGenesExp<-teGeneRetrieval(se,expressedGeneThreshold = 1)
+print(length(inputGenes))
+gs<-GeneSet(geneIds=toupper(inputGenes))
+output2<-teEnrichmentCustom(gs,cellSpecificGenesExp)
+enrichmentOutput<-setNames(data.frame(assay(output2[[1]]),row.names = rowData(output2[[1]])[,1]),colData(output2[[1]])[,1])
+row.names(cellDetails)<-cellDetails$RName
+enrichmentOutput$Tissue<- cellDetails[row.names(enrichmentOutput),"CellName"]
+sct.cluster6.genes <- as.data.frame(assay(output2[[2]][["SCT"]]))[1]
+sct.cluster6.genes <- humanGeneMapping[humanGeneMapping$Gene %in% as.list(sct.cluster6.genes$Gene),]
+sct.cluster6.genes <- sct.cluster6.genes$Gene.name
+x = list(sct.cluster5.genes, sct.cluster6.genes)
+```
+
+```{r fig5a, fig.show='hold', fig.width=6, fig.height=5, fig.cap="Fig5A: STB specific genes shared by clusters 5 and 6"}
+names(x) <- c("STB genes of Cluster 5","STB genes of Cluster 6")
+ggvenn(
+    x, 
+    fill_color = color_list[5:6],
+    stroke_size = NA, 
+    set_name_size = 4, 
+    show_percentage = FALSE
+)
+```
+
+```{r fig5bc, out.width=c('50%', '50%'), fig.show='hold', fig.width=2, fig.height=5, fig.cap="Fig5: STB specific genes shared by clusters 5 and 6. Some highly expressed STB specific genes show (A) higher expression in cluster 5 and (B) higher expression in cluster 6" }
+
+fig5b <- c("KRT8", "S100P", "XAGE2")
+fig5b <- c("ERVV-1", "TBX3", "GRHL1")
+
+multi_dittoPlot(cluster5n6, vars = fig5b, group.by = "new_clusters",
+                vlnplot.lineweight = 0.2, jitter.size = 0.3, ncol = 1, color.panel = c(color_list[5:6]))
+
+multi_dittoPlot(cluster5n6, vars = fig5b, group.by = "new_clusters",
+                vlnplot.lineweight = 0.2, jitter.size = 0.3, ncol = 1, color.panel = c(color_list[5:6]))
+
+```
+
+
+### Figure S4
+
+```{r figS4a, fig.width=6, fig.height=3, fig.cap="Fig S4A: Violin plots showing low expression levels for mesoderm genes" }
+mesoderm <- c("FOXC1", "TWIST2")
+endoderm <- c("AFP", "GATA6")
+ectoderm <- c("NES", "PAX6")
+multi_dittoPlot(bapd8.integrated, vars = mesoderm, group.by = "new_clusters",
+                       vlnplot.lineweight = 0.2, jitter.size = 0.3, ncol = 1, color.panel = color_list)
+```
+```{r figS4b, fig.width=6, fig.height=3, fig.cap="Fig S4B: Violin plots showing low expression levels for endoderm genes" }
+multi_dittoPlot(bapd8.integrated, vars = endoderm, group.by = "new_clusters",
+                       vlnplot.lineweight = 0.2, jitter.size = 0.3, ncol = 1, color.panel = color_list)
+```
+
+```{r figS4c, fig.width=6, fig.height=3, fig.cap="Fig S4C: Violin plots showing low expression levels for ectoderm genes" }
+multi_dittoPlot(bapd8.integrated, vars = ectoderm, group.by = "new_clusters",
+                       vlnplot.lineweight = 0.2, jitter.size = 0.3, ncol = 1, color.panel = color_list)
+```
+
+
+
+### Figure S5
+
+
+```{r figS5, fig.width=6, fig.height=8, fig.cap="Fig S5: Expression levels of Cellular Proliferation Markers across clusters" }
+cpm <- c("CCNB1", "MKI67", "PCNA", "CENPF")
+multi_dittoPlot(bapd8.integrated, vars = cpm, group.by = "new_clusters", 
+                vlnplot.lineweight = 0.2, jitter.size = 0.3, ncol = 1, color.panel = color_list)
+```
+
+
+```{r figS6, out.width=c('33%', '33%', '33%'), fig.show='hold', fig.width=2, fig.height=8, fig.cap="Fig S6: Expression levels of genes in Clusters 2 and 3."}
+figs6a <- c("TLE4", "PCDH9", "MAML2", "TMSB4Y", "CA3")
+figs6b <- c("TAGLN", "TMSB10", "S100A11", "S100A6", "S100A10")
+figs6c <- c("ACTB", "ACTG1", "IL32", "MYL6", "TPM1")
+multi_dittoPlot(cluster2n3, vars = figs6a, group.by = "new_clusters",
+                vlnplot.lineweight = 0.2, jitter.size = 0.3, ncol = 1, color.panel = c(color_list[2:3]))
+multi_dittoPlot(cluster2n3, vars = figs6b, group.by = "new_clusters",
+                vlnplot.lineweight = 0.2, jitter.size = 0.3, ncol = 1, color.panel = c(color_list[2:3]))
+multi_dittoPlot(cluster2n3, vars = figs6c, group.by = "new_clusters",
+                vlnplot.lineweight = 0.2, jitter.size = 0.3, ncol = 1, color.panel = c(color_list[2:3]))
+```
+
+```{r figS7, fig.width=5, fig.height=9, fig.cap="Fig S7: Expression differences of selected genes across treatments shown as violin plots." }
+figs7 <- c("SLC2A3", "CLIC3", "FN1", "APOE",  "COL3A1", "LUM")
+multi_dittoPlot(cluster2356, vars = figs7, group.by = "new_clusters", split.by = "replicate",
+                vlnplot.lineweight = 0.2, jitter.size = 0.3, ncol = 1, color.panel = c("#0571b0", "#0571b0", "#0571b0", "#0571b0"))
+```
+
+
+```{r figS8, fig.width=8, fig.height=4, fig.cap="Fig S8: SOX2 localization in the dimensionality reduction plot  and its (B) expression  across clusters."}
+figs8a <- FeaturePlot(bapd8.integrated, features = "SOX2", min.cutoff = "q9")
+figs8b <- VlnPlot(bapd8.integrated, "SOX2", group.by = "new_clusters")
+figs8a | figs8b
+```
+
+
+
+## Save Cerebro Image
+
+We will save the results to a `Cerebro` image file. [Cerebro](https://github.com/romanhaa/Cerebro) allows users to interactively visualize various parts of single cell transcriptomics data without requiring bioinformatic expertise. `CerebriApp`, helper R package, lets us export the `Seurat` analyses to load it into the `Cerebro`.
+
+```{r cerebro}
+bapd8.integrated <- BuildClusterTree(
+  bapd8.integrated,
+  dims = 1:30,
+  reorder = TRUE,
+  reorder.numeric = TRUE
+)
+bapd8.integrated[['cluster']] <- factor(
+  as.character(bapd8.integrated@meta.data$tree.ident),
+  levels = sort(unique(bapd8.integrated@meta.data$tree.ident))
+)
+bapd8.integrated@meta.data$seurat_clusters <- NULL
+bapd8.integrated@meta.data$RNA_snn_res.0.5 <- NULL
+bapd8.integrated@meta.data$tree.ident <- NULL
+bapd8.integrated <- RunTSNE(
+  bapd8.integrated,
+  reduction.name = 'tSNE',
+  reduction.key = 'tSNE_',
+  dims = 1:30,
+  dim.embed = 2,
+  perplexity = 30,
+  seed.use = 100
+)
+bapd8.integrated <- RunTSNE(
+  bapd8.integrated,
+  reduction.name = 'tSNE_3D',
+  reduction.key = 'tSNE3D_',
+  dims = 1:30,
+  dim.embed = 3,
+  perplexity = 30,
+  seed.use = 100
+)
+bapd8.integrated <- RunUMAP(
+  bapd8.integrated,
+  reduction.name = 'UMAP_3D',
+  reduction.key = 'UMAP3D_',
+  dims = 1:30,
+  n.components = 3,
+  seed.use = 100
+)
+bapd8.integrated@meta.data$sample <- factor('BAPd8_O2Level', levels = 'BAPd8_O2Level')
+bapd8.integrated@misc$experiment <- list(
+  experiment_name = 'BAPd8_O2Level',
+  organism = 'hg',
+  date_of_analysis = Sys.Date()
+)
+
+bapd8.integrated@misc$technical_info <- list(
+  'R' = capture.output(devtools::session_info())
+)
+
+bapd8.integrated@misc$parameters <- list(
+  gene_nomenclature = 'gene_name',
+  discard_genes_expressed_in_fewer_cells_than = 10,
+  keep_mitochondrial_genes = TRUE,
+  variables_to_regress_out = 'nUMI',
+  number_PCs = 30,
+  tSNE_perplexity = 30,
+  cluster_resolution = 0.5
+)
+
+bapd8.integrated@misc$parameters$filtering <- list(
+  UMI_min = 100,
+  UMI_max = Inf,
+  genes_min = 200,
+  genes_max = Inf
+)
+
+bapd8.integrated <- cerebroApp::addPercentMtRibo(
+  bapd8.integrated,
+  organism = 'hg',
+  gene_nomenclature = 'name'
+)
+bapd8.integrated <- cerebroApp::getMostExpressedGenes(
+  bapd8.integrated,
+  groups = c('replicate', 'orig.ident', 'cluster' )
+)
+bapd8.integrated <- cerebroApp::getMarkerGenes(
+  bapd8.integrated,
+  organism = 'hg',
+  groups = c('replicate', 'orig.ident', 'cluster' )
+)
+bapd8.integrated <- cerebroApp::getEnrichedPathways(
+  bapd8.integrated,
+  databases = c("GO_Biological_Process_2018", "GO_Cellular_Component_2018",
+                "GO_Molecular_Function_2018", "KEGG_2016", "WikiPathways_2016", "Reactome_2016",
+                "Panther_2016", "Human_Gene_Atlas", "Mouse_Gene_Atlas"),
+  adj_p_cutoff = 0.05,
+  max_terms = 100,
+  URL_API = "http://amp.pharm.mssm.edu/Enrichr/enrich"
+)
+cerebroApp::exportFromSeurat(
+  bapd8.integrated,
+  assay = "RNA",
+  slot = "data",
+  file ="Cerebro_BAPd8_O2Level.crb",
+  experiment_name = 'BAPd8_O2Level',
+  organism = 'hg',
+  groups = c("orig.ident", "replicate", "cluster"),
+  cell_cycle = NULL,
+  nUMI = 'nCount_RNA',
+  nGene = 'nFeature_RNA',
+  add_all_meta_data = TRUE,
+  use_delayed_array = FALSE,
+  verbose = FALSE
+)
+```
+
+
+## Save RDS file
+
+Finally we will save the entire session data to an external file. This can be explored again by loading it in R in the future if there is any need.
+
+```{r rds}
+saveRDS(bapd8.integrated, 'bapd8.integrated.rds')
+```
+
+## Session Info
+
+Complete session information
+
+```{r session}
+sessionInfo()
+```

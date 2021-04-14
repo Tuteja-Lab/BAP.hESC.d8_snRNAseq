@@ -1,10 +1,13 @@
 ---
 title: 'BAP treated hESC (day 8) snRNAseq data analyses '
-author: "Arun Seetharam"
+author:
+  name: "Arun Seetharam"
+  affiliation: Tuteja Lab, Iowa State University, Ames, IA 50011
+  affiliation_url: https://www.tutejalab.org/
 date: "3/24/2021"
 output:
   github_document:
-    number_sections: TRUE
+    number_sections: FALSE
     toc: TRUE
     toc_depth: 3
 editor_options:
@@ -64,10 +67,10 @@ library(enrichR)
 
 ## Importing 10x Datasets
 
-The 10X data was already processed with `CellRanger` and the coutns table was ready for us to import for the data analyses.
+The 10X data was already processed with `CellRanger` (v.4.0.0) and the counts table was ready for us to import for the data analyses.
 We used the inbuilt function to import this data and to create a `Seurat` object as described below.
 
-```{r dataset, echo=FALSE}
+```{r dataset}
 
 experiment_name = "BAP"
 dataset_loc <- "Z:/Documents/snRNAseq-placenta-project/expression-data"
@@ -99,7 +102,7 @@ After the data was imported, we checked the quality of the data. Mitochondrial e
 
 ### MT ratio in nucleus
 
-```{r snrnaseqQC1, dpi = 150, fig.width=8, fig.height=8, fig.cap= "Relationship between the total molecules detected (transcripts) vs. total genes detected across samples. Each nucleus is represented as a dot, with the color intensity representing the mitochondrial read ratio in that nucleus."}
+```{r snrnaseqQC1, fig.width=8, fig.height=8, fig.cap= "Relationship between the total molecules detected (transcripts) vs. total genes detected across samples. Each nucleus is represented as a dot, with the color intensity representing the mitochondrial read ratio in that nucleus."}
 bapd8.combined$log10GenesPerUMI <- log10(bapd8.combined$nFeature_RNA) / log10(bapd8.combined$nCount_RNA)
 bapd8.combined$mitoRatio <- PercentageFeatureSet(object = bapd8.combined, pattern = "^MT-")
 bapd8.combined$mitoRatio <- bapd8.combined@meta.data$mitoRatio / 100
@@ -129,13 +132,13 @@ p <- ggplot(dat = metadata, aes(x=nUMI, y=nGene, color=mitoRatio)) +
                                                   "5pcO2_r2" = "5% Oxygen (rep2)"))) +
   scale_y_continuous(label=comma) +
   scale_x_continuous(label=comma) 
-p
-#ggplotly(p)
+
+ggplotly(p)
 ```
 
 ### Number of nuclei per sample
 
-```{r snrnaseqQC2, dpi = 150, fig.width=6, fig.height=4, fig.cap= "Number of nucleus found in each sample" }
+```{r snrnaseqQC2, fig.width=6, fig.height=4, fig.cap= "Number of nuclei found in each sample" }
 ggplot(metadata, aes(x=seq_folder, fill=seq_folder)) + 
   geom_bar() +
   theme_classic() +
@@ -146,7 +149,7 @@ ggplot(metadata, aes(x=seq_folder, fill=seq_folder)) +
 
 ### Density of nuclei per sample
 
-```{r snrnaseqQC3, dpi = 150, fig.width=6, fig.height=4, fig.cap="Density of nucleus vs. UMIs"  }
+```{r snrnaseqQC3, fig.width=6, fig.height=4, fig.cap="Density of nuclei vs. UMIs"  }
 ggplot(metadata, aes(color=seq_folder, x=nUMI, fill= seq_folder)) + 
   geom_density(alpha = 0.2) + 
   scale_x_log10() + 
@@ -155,9 +158,9 @@ ggplot(metadata, aes(color=seq_folder, x=nUMI, fill= seq_folder)) +
   geom_vline(xintercept = 500)
 ```
 
-### Nubmer of Nuclei vs. genes
+### Number of Nuclei vs. genes
 
-```{r snrnaseqQC4, dpi = 150, fig.width=6, fig.height=4, fig.cap="Nubmer of Nucleus vs. genes"}
+```{r snrnaseqQC4, fig.width=6, fig.height=4, fig.cap="Nubmer of nuclei vs. genes"}
 ggplot(metadata, aes(x=seq_folder, y=log10(nGene), fill=seq_folder)) + 
   geom_boxplot() + 
   theme_classic() +
@@ -166,18 +169,19 @@ ggplot(metadata, aes(x=seq_folder, y=log10(nGene), fill=seq_folder)) +
   ggtitle("NNuclei vs NGenes")
 ```
 
-### Nubmer of Nuclei vs. genes
+### Number of Nuclei vs. genes
 
-```{r snrnaseqQC5, dpi = 150, fig.width=6, fig.height=4, fig.cap="Nubmer of Nuclei vs. genes" }
+```{r snrnaseqQC5, fig.width=6, fig.height=4, fig.cap="Nubmer of Nuclei vs. genes" }
 ggplot(metadata, aes(x=log10GenesPerUMI, color = seq_folder, fill=seq_folder)) +
   geom_density(alpha = 0.2) +
   theme_classic() +
   geom_vline(xintercept = 0.8)
+
 ```
 
-### Nubmer of Nuclei vs. genes
+### Mitochondrial density across samples
 
-```{r snrnaseqQC6, dpi = 150, fig.width=6, fig.height=4 }
+```{r snrnaseqQC6, fig.width=6, fig.height=4, fig.cap="Mitochondrial density across samples"}
 ggplot(metadata, aes(color=seq_folder, x=mitoRatio, fill=seq_folder)) + 
   geom_density(alpha = 0.2) + 
   scale_x_log10() + 
@@ -191,7 +195,7 @@ After inspection, we decided to remove all mitochondiral genes as well as riboso
 
 ### set up the metadata file and organize
 
-```{r filtering1, dpi = 150, fig.width=6, fig.height=4 }
+```{r filtering1, fig.width=6, fig.height=4 }
 bapd8.combined <- bapd8.temp
 df <- bapd8.combined@meta.data
 df$replicate <- NA
@@ -199,12 +203,12 @@ df$replicate[which(str_detect(df$orig.ident, "5pcO2"))] <- "5pcO2"
 df$replicate[which(str_detect(df$orig.ident, "20pcO2"))] <- "20pcO2"
 bapd8.combined@meta.data <- df
 bapd8.combined[["percent.mt"]] <- PercentageFeatureSet(bapd8.combined, pattern = "^MT-")
-#datatable(bapd8.combined@meta.data, rownames = TRUE, filter="top", options = list(pageLength = 15, scrollX=T) )
+datatable(bapd8.combined@meta.data, rownames = TRUE, filter="top", options = list(pageLength = 15, scrollX=T) )
 ```
 
 ### set up the metadata file and organize
 
-```{r filtering2, dpi = 150, fig.width=8, fig.height=4.5 }
+```{r filtering2, fig.width=8, fig.height=4.5 }
 v1 <- VlnPlot(bapd8.combined, features = "nFeature_RNA", pt.size = 1) + 
   geom_hline(yintercept=200, color = "red", size=1) +
   geom_hline(yintercept=7500, color = "red", size=1) +
@@ -219,7 +223,7 @@ v1 | v2 | v3
 
 ### Before filtering
 
-```{r filtering3, dpi = 150, fig.width=10, fig.height=5 }
+```{r filtering3, fig.width=10, fig.height=5 }
 B1 <- FeatureScatter(bapd8.combined, feature1 = "nCount_RNA", feature2 = "percent.mt")
 B2 <- FeatureScatter(bapd8.combined, feature1 = "nCount_RNA", feature2 = "nFeature_RNA")
 B1 | B2
@@ -228,7 +232,7 @@ B1 | B2
 ### Preliminary filtering
 
 
-```{r filtering4, dpi = 150, fig.width=10, fig.height=5 }
+```{r filtering4, fig.width=10, fig.height=5 }
 bapd8.combined <- subset(bapd8.combined, subset = nFeature_RNA > 200 & nFeature_RNA < 7500 & percent.mt < 25)
 I1 <- FeatureScatter(bapd8.combined, feature1 = "nCount_RNA", feature2 = "percent.mt")
 I2 <- FeatureScatter(bapd8.combined, feature1 = "nCount_RNA", feature2 = "nFeature_RNA")
@@ -238,7 +242,7 @@ I1 | I2
 
 ### Final filtering
 
-```{r filtering5, dpi = 150, fig.width=10, fig.height=5 }
+```{r filtering5, fig.width=10, fig.height=5 }
 bapd8.combined <- subset(bapd8.combined, subset = nFeature_RNA > 200 & nFeature_RNA < 7500 & percent.mt < 15)
 A1 <- FeatureScatter(bapd8.combined, feature1 = "nCount_RNA", feature2 = "percent.mt")
 A2 <- FeatureScatter(bapd8.combined, feature1 = "nCount_RNA", feature2 = "nFeature_RNA")
@@ -247,7 +251,7 @@ A1 | A2
 
 ### Removing ribosomal and MT proteins
 
-```{r filtering6, dpi = 150, fig.width=8, fig.height=6 }
+```{r filtering6, fig.width=8, fig.height=6 }
 counts <- GetAssayData(object = bapd8.combined, slot = "counts")
 counts <- counts[grep(pattern = "^MT", x = rownames(counts), invert = TRUE),]
 counts <- counts[grep(pattern = "^MT", x = rownames(counts), invert = TRUE),]
@@ -307,18 +311,17 @@ Idents(bapd8.integrated) <- "new_clusters"
 The Dimensional reduction plot was plotted using the `Seurat` `DipPlot` function, with colors representing different groups/clusters.
 
 
-```{r dimplot1, dpi = 150, fig.width=6, fig.height=6, fig.cap="Fig2A: Dimensional reduction plot showing 5,355 nuclei plotted in two dimensions. The colored dots represent individual nuclei and are assigned based on cluster identity" }
+```{r dimplot1, fig.width=6, fig.height=6, fig.cap="Fig2A: Dimensional reduction plot showing 5,355 nuclei plotted in two dimensions. The colored dots represent individual nuclei and are assigned based on cluster identity" }
 d1 <- enhancedDimPlot(object = bapd8.integrated, grouping_var = 'ident', reduction = "umap", label = TRUE, pt.size = 1, alpha = 0.5) +
   ggtitle("A") + xlab("UMAP_1") + ylab("UMAP_2") +
   theme_classic() +
   theme(legend.position = "none", plot.title = element_text(face = "bold"))
-#ggplotly(d1)
-d1
+ggplotly(d1)
 ```
 
 ### dimplots (colored based on conditions)
 
-```{r dimplot2, dpi = 150, fig.width=8, fig.height=6, fig.cap="Fig2B: Dimensional reduction plot showing 5,355 nuclei plotted in two dimensions. The colored dots represent individual nuclei and are assigned based on treatment." }
+```{r dimplot2, fig.width=8, fig.height=6, fig.cap="Fig2B: Dimensional reduction plot showing 5,355 nuclei plotted in two dimensions. The colored dots represent individual nuclei and are assigned based on treatment." }
 d2 <- enhancedDimPlot(object = bapd8.integrated, grouping_var = 'replicate', reduction = "umap", label = FALSE, pt.size = 1, alpha = 0.4) +
   ggtitle("B") +
   xlab("UMAP_1") +
@@ -332,13 +335,12 @@ d2 <- enhancedDimPlot(object = bapd8.integrated, grouping_var = 'replicate', red
                     labels = c(expression(paste('20% ', 'O'[2])), expression(paste('5% ', 'O'[2]))), 
                     values = c("20pcO2" = "#0571b0", "5pcO2" = "#ca0020")) +
   scale_linetype_manual(values = "blank")
-#ggplotly(d2)
-d2
+ggplotly(d2)
 ```
 
 ### dimplots (colored based on samples)
 
-```{r dimplot3, dpi = 150, fig.width=8, fig.height=6, fig.cap="Fig2C: Dimensional reduction plot showing 5,355 nuclei plotted in two dimensions. The colored dots represent individual nuclei and are assigned based on replicate"}
+```{r dimplot3, fig.width=8, fig.height=6, fig.cap="Fig2C: Dimensional reduction plot showing 5,355 nuclei plotted in two dimensions. The colored dots represent individual nuclei and are assigned based on replicate"}
 
 d3 <- enhancedDimPlot(object = bapd8.integrated, grouping_var = 'orig.ident', reduction = "umap", label = FALSE, pt.size = 1, alpha = 0.4) +
   ggtitle("C") +
@@ -354,8 +356,7 @@ d3 <- enhancedDimPlot(object = bapd8.integrated, grouping_var = 'orig.ident', re
                     values = c("20pcO2_r1" = "#0571b0", "20pcO2_r2" = "#92c5de", "5pcO2_r1" = "#ca0020", "5pcO2_r2" = "#f4a582")) +
   scale_linetype_manual(values = "blank")
 
-#ggplotly(d3)
-d3
+ggplotly(d3)
 ```
 
 ## Find markers
@@ -399,7 +400,7 @@ message (paste("Cluster 9 as", length(markers.filtered.names.9), "markers", sep 
 
 ## Marker plots
 
-Combined expression of all the markers genes in various clusters. The markers have higher expression in their respecitve cluster than compared to rest of the clusters.
+Combined expression of all the markers genes in various clusters. The markers have higher expression in their respecitve cluster than compared to the rest of the clusters.
 
 
 ```{r definecolors}
@@ -426,55 +427,55 @@ grouped_violinPlots <- function(markersfile, clusternumber, seuratobject = bapd8
 
 ### Markers of cluster 1
 
-```{r cluster1, dpi = 150, fig.width=6, fig.height=4 }
+```{r cluster1, fig.width=6, fig.height=4 }
 grouped_violinPlots(markers.filtered.names.1, 1)
 ```
 
 ### Markers of cluster 2
 
-```{r cluster2, dpi = 150, fig.width=6, fig.height=4 }
+```{r cluster2, fig.width=6, fig.height=4 }
 grouped_violinPlots(markers.filtered.names.2, 2)
 ```
 
 ### Markers of cluster 3
 
-```{r cluster3, dpi = 150, fig.width=6, fig.height=4 }
+```{r cluster3, fig.width=6, fig.height=4 }
 grouped_violinPlots(markers.filtered.names.3, 3)
 ```
 
 ### Markers of cluster 4
 
-```{r cluster4, dpi = 150, fig.width=6, fig.height=4 }
+```{r cluster4, fig.width=6, fig.height=4 }
 grouped_violinPlots(markers.filtered.names.4, 4)
 ```
 
 ### Markers of cluster 5
 
-```{r cluster5, dpi = 150, fig.width=6, fig.height=4 }
+```{r cluster5, fig.width=6, fig.height=4 }
 grouped_violinPlots(markers.filtered.names.5, 5)
 ```
 
 ### Markers of cluster 6
 
-```{r cluster6, dpi = 150, fig.width=6, fig.height=4 }
+```{r cluster6, fig.width=6, fig.height=4 }
 grouped_violinPlots(markers.filtered.names.6, 6)
 ```
 
 ### Markers of cluster 7
 
-```{r cluster7, dpi = 150, fig.width=6, fig.height=4 }
+```{r cluster7, fig.width=6, fig.height=4 }
 grouped_violinPlots(markers.filtered.names.7, 7)
 ```
 
 ### Markers of cluster 8
 
-```{r cluster8, dpi = 150, fig.width=6, fig.height=4 }
+```{r cluster8, fig.width=6, fig.height=4 }
 grouped_violinPlots(markers.filtered.names.8, 8)
 ```
 
 ### Markers of cluster 9
 
-```{r cluster9, dpi = 150, fig.width=6, fig.height=4 }
+```{r cluster9, fig.width=6, fig.height=4 }
 grouped_violinPlots(markers.filtered.names.9, 9)
 ```
 
@@ -521,55 +522,55 @@ runpce <- function(inputgenelist, clusternumber) {
 
 ### PCE for cluster 1 markers
 
-```{r runPCE1, dpi = 150, fig.width=8, fig.height=6 }
+```{r runPCE1, fig.width=8, fig.height=6 }
 runpce(markers.filtered.names.1, 1)
 ```
 
 ### PCE for cluster 2 markers
 
-```{r runPCE2, dpi = 150, fig.width=8, fig.height=6 }
+```{r runPCE2, fig.width=8, fig.height=6 }
 runpce(markers.filtered.names.2, 2)
 ```
 
 ### PCE for cluster 3 markers
 
-```{r runPCE3, dpi = 150, fig.width=8, fig.height=6 }
+```{r runPCE3, fig.width=8, fig.height=6 }
 runpce(markers.filtered.names.3, 3)
 ```
 
 ### PCE for cluster 4 markers
 
-```{r runPCE4, dpi = 150, fig.width=8, fig.height=6 }
+```{r runPCE4, fig.width=8, fig.height=6 }
 runpce(markers.filtered.names.4, 4)
 ```
 
 ### PCE for cluster 5 markers
 
-```{r runPCE5, dpi = 150, fig.width=8, fig.height=6 }
+```{r runPCE5, fig.width=8, fig.height=6 }
 runpce(markers.filtered.names.5, 5)
 ```
 
 ### PCE for cluster 6 markers
 
-```{r runPCE6, dpi = 150, fig.width=8, fig.height=6 }
+```{r runPCE6, fig.width=8, fig.height=6 }
 runpce(markers.filtered.names.6, 6)
 ```
 
 ### PCE for cluster 7 markers
 
-```{r runPCE7, dpi = 150, fig.width=8, fig.height=6 }
+```{r runPCE7, fig.width=8, fig.height=6 }
 runpce(markers.filtered.names.7, 7)
 ```
 
 ### PCE for cluster 8 markers
 
-```{r runPCE8, dpi = 150, fig.width=8, fig.height=6 }
+```{r runPCE8, fig.width=8, fig.height=6 }
 runpce(markers.filtered.names.8, 8)
 ```
 
 ### PCE for cluster 9 markers
 
-```{r runPCE9, dpi = 150, fig.width=8, fig.height=6 }
+```{r runPCE9, fig.width=8, fig.height=6 }
 runpce(markers.filtered.names.9, 9)
 ```
 
@@ -633,7 +634,7 @@ Find all markers using the in build function of `Seurat`
 ```{r findallmarkers}
 bapd8.markers <- FindAllMarkers(bapd8.integrated, only.pos = TRUE, min.pct = 0.25, logfc.threshold = 0.25)
 bapd8.markers.ranked.10.percluster <- bapd8.markers %>% group_by(cluster) %>% top_n(n = 10, wt = avg_logFC)
-#datatable(bapd8.markers.ranked.10.percluster, rownames = FALSE, filter="top", options = list(pageLength = 10, scrollX=T))
+datatable(bapd8.markers.ranked.10.percluster, rownames = FALSE, filter="top", options = list(pageLength = 10, scrollX=T))
 ```
 
 
@@ -667,14 +668,14 @@ avg.data$gene <- row.names(avg.data)
 avg.data <- as_data_frame(avg.data)
 avg.data <- avg.data[, c(10, 1, 2, 3, 4, 5, 6, 7, 8, 9)]
 colnames(avg.data) <- c("Gene", paste("Cluster", colnames(avg.data[2:10]), sep = "_"))
-#datatable(avg.data, rownames = FALSE, filter="top", options = list(pageLength = 10, scrollX=T))
+datatable(avg.data, rownames = FALSE, filter="top", options = list(pageLength = 10, scrollX=T))
 ```
 
 ### Cell numbers per clusters
 
 Generate a summary table showing the number of cells in each cluster, broken down by replicates and treatment.
 
-```{r clusterstats, dpi = 150, fig.width=8, fig.height=5 }
+```{r clusterstats, fig.width=8, fig.height=5 }
 cells <- bapd8.integrated@meta.data	%>%
   dplyr::group_by(orig.ident,	new_clusters, replicate)	%>%	
   dplyr::summarise(length(new_clusters)) %>%
@@ -699,7 +700,7 @@ ggplot(cells, aes(x = cluster, y = number.of.cells, fill = cluster )) +
 
 ## DE between conditions and Volcano plots
 
-The DE was carried out between the conditions for each cluster. First we modified the metadata to create a separate column that has both the condition as well as the cluster number and then we use the `Seurat`'s `FindMarkers` to find the genes that are differentially expressed. The genes that have log2FC > 1 or <-1 are shown in color if they alos have p-val <0.05.
+The DE was carried out between the conditions for each cluster. First we modified the metadata to create a separate column that has both the condition as well as the cluster number and then we used `Seurat`'s `FindMarkers` to find the genes that are differentially expressed. The genes that have log2FC > 1 or <-1 are shown in color if they also have p-val <0.05.
 
 ```{r de}
 head(bapd8.integrated@meta.data)
@@ -743,9 +744,9 @@ commands.p <- paste(paste(lhs.p, rhs.p, sep="<-"), collapse=";")
 eval(parse(text=commands.p))
 ```
 
-Volcano Plots: This plots allows us to visualize the genes that are overexpressed in each condition along with its p-value. First, we will setup a function to make a volcano plot and then we call them for each cluster and depict them as an interactive plot.
+Volcano Plot function: This plots allows us to visualize the genes that are overexpressed in each condition along with its p-value. First, we will setup a function to make a volcano plot and then we call them for each cluster and depict them as an interactive plot.
 
-```{r volcano, dpi = 150, fig.width=8, fig.height=6 }
+```{r volcano, fig.width=8, fig.height=6 }
 
 myVolcanoPlot <- function(mydf, clus.number) {
 de <- ggplot(data=mydf, aes(x=log2fc, y=-log10(p_val), col=diffexpressed, label=delabel)) +
@@ -763,59 +764,50 @@ return(de)
 
 ### Volcano plot for cluster 1
 
-```{r de.clus1, dpi = 150, fig.width=8, fig.height=6, fig.cap="Fig.6-1: Interactive Volcano plot showing genes overexpressed in 5% and 20% oxygen conditions for cluster 1" }
-#ggplotly(myVolcanoPlot(clus1.five.twenty, 1))
-myVolcanoPlot(clus1.five.twenty, 1)
+```{r de.clus1, fig.width=8, fig.height=6, fig.cap="Fig.6-1: Interactive Volcano plot showing genes upregulated in 5% and 20% oxygen conditions for cluster 1" }
+ggplotly(myVolcanoPlot(clus1.five.twenty, 1))
 ```
 
 ### Volcano plot for cluster 2
 
-```{r de.clus2, dpi = 150, fig.width=8, fig.height=6, fig.cap="Fig.6-2: Interactive Volcano plot showing genes overexpressed in 5% and 20% oxygen conditions for cluster 2" }
-#ggplotly(myVolcanoPlot(clus2.five.twenty, 2))
-myVolcanoPlot(clus2.five.twenty, 2)
+```{r de.clus2, fig.width=8, fig.height=6, fig.cap="Fig.6-2: Interactive Volcano plot showing genes upregulated in 5% and 20% oxygen conditions for cluster 2" }
+ggplotly(myVolcanoPlot(clus2.five.twenty, 2))
 ```
 
 ### Volcano plot for cluster 3
 
-```{r de.clus3, dpi = 150, fig.width=8, fig.height=6, fig.cap="Fig.6-3: Interactive Volcano plot showing genes overexpressed in 5% and 20% oxygen conditions for cluster 3" }
-#ggplotly(myVolcanoPlot(clus3.five.twenty, 3))
-myVolcanoPlot(clus3.five.twenty, 3)
+```{r de.clus3, fig.width=8, fig.height=6, fig.cap="Fig.6-3: Interactive Volcano plot showing genes upregulated in 5% and 20% oxygen conditions for cluster 3" }
+ggplotly(myVolcanoPlot(clus3.five.twenty, 3))
 ```
 ### Volcano plot for cluster 4
 
-```{r de.clus4, dpi = 150, fig.width=8, fig.height=6, fig.cap="Fig.6-4: Interactive Volcano plot showing genes overexpressed in 5% and 20% oxygen conditions for cluster 4" }
-#ggplotly(myVolcanoPlot(clus4.five.twenty, 4))
-myVolcanoPlot(clus4.five.twenty, 4)
+```{r de.clus4, fig.width=8, fig.height=6, fig.cap="Fig.6-4: Interactive Volcano plot showing genes upregulated in 5% and 20% oxygen conditions for cluster 4" }
+ggplotly(myVolcanoPlot(clus4.five.twenty, 4))
 ```
 ### Volcano plot for cluster 5
 
-```{r de.clus5, dpi = 150, fig.width=8, fig.height=6, fig.cap="Fig.6-5: Interactive Volcano plot showing genes overexpressed in 5% and 20% oxygen conditions for cluster 5" }
-#ggplotly(myVolcanoPlot(clus5.five.twenty, 5))
-myVolcanoPlot(clus5.five.twenty, 5)
+```{r de.clus5, fig.width=8, fig.height=6, fig.cap="Fig.6-5: Interactive Volcano plot showing genes upregulated in 5% and 20% oxygen conditions for cluster 5" }
+ggplotly(myVolcanoPlot(clus5.five.twenty, 5))
 ```
 ### Volcano plot for cluster 6
 
-```{r de.clus6, dpi = 150, fig.width=8, fig.height=6, fig.cap="Fig.6-6: Interactive Volcano plot showing genes overexpressed in 5% and 20% oxygen conditions for cluster 6" }
-#ggplotly(myVolcanoPlot(clus6.five.twenty, 6))
-myVolcanoPlot(clus6.five.twenty, 6)
+```{r de.clus6, fig.width=8, fig.height=6, fig.cap="Fig.6-6: Interactive Volcano plot showing genes upregulated in 5% and 20% oxygen conditions for cluster 6" }
+ggplotly(myVolcanoPlot(clus6.five.twenty, 6))
 ```
 ### Volcano plot for cluster 7
 
-```{r de.clus7, dpi = 150, fig.width=8, fig.height=6, fig.cap="Fig.6-7: Interactive Volcano plot showing genes overexpressed in 5% and 20% oxygen conditions for cluster 7" }
-#ggplotly(myVolcanoPlot(clus7.five.twenty, 7))
-myVolcanoPlot(clus7.five.twenty, 7)
+```{r de.clus7, fig.width=8, fig.height=6, fig.cap="Fig.6-7: Interactive Volcano plot showing genes upregulated in 5% and 20% oxygen conditions for cluster 7" }
+ggplotly(myVolcanoPlot(clus7.five.twenty, 7))
 ```
 ### Volcano plot for cluster 8
 
-```{r de.clus8, dpi = 150, fig.width=8, fig.height=6, fig.cap="Fig.6-8: Interactive Volcano plot showing genes overexpressed in 5% and 20% oxygen conditions for cluster 8" } 
-#ggplotly(myVolcanoPlot(clus8.five.twenty, 8))
-myVolcanoPlot(clus8.five.twenty, 8)
+```{r de.clus8, fig.width=8, fig.height=6, fig.cap="Fig.6-8: Interactive Volcano plot showing genes upregulated in 5% and 20% oxygen conditions for cluster 8" } 
+ggplotly(myVolcanoPlot(clus8.five.twenty, 8))
 ```
 ### Volcano plot for cluster 9
 
-```{r de.clus9, dpi = 150, fig.width=8, fig.height=6, fig.cap="Fig.6-9: Interactive Volcano plot showing genes overexpressed in 5% and 20% oxygen conditions for cluster 9"}
-#ggplotly(myVolcanoPlot(clus9.five.twenty, 9))
-myVolcanoPlot(clus9.five.twenty, 9)
+```{r de.clus9, fig.width=8, fig.height=6, fig.cap="Fig.6-9: Interactive Volcano plot showing genes upregulated in 5% and 20% oxygen conditions for cluster 9"}
+ggplotly(myVolcanoPlot(clus9.five.twenty, 9))
 ```
 
 
@@ -825,7 +817,7 @@ myVolcanoPlot(clus9.five.twenty, 9)
 
 Prepare dataset for individual plots
 
-```{r dataprep, dpi = 150, fig.width=8, fig.height=6 }
+```{r dataprep, fig.width=8, fig.height=6 }
 DefaultAssay(bapd8.integrated) <- "RNA"
 Idents(bapd8.integrated) <- "new_clusters"
 cluster5n6 <- subset(bapd8.integrated, idents = c("5", "6"))
@@ -843,7 +835,7 @@ DefaultAssay(cluster2n3) <- "RNA"
 
 Transcription factors
 
-```{r fig3a, dpi = 150, fig.width=7, fig.height=3, fig.cap="Fig3A: Violin plots showing expression (average log fold change) for genes encoding transcription factors" }
+```{r fig3a, fig.width=7, fig.height=3, fig.cap="Fig3A: Violin plots showing expression (average log fold change) for genes encoding transcription factors" }
 fig3a <- c("GATA3", "TFAP2A")
 multi_dittoPlot(bapd8.integrated, vars = fig3a, group.by = "new_clusters",
                        vlnplot.lineweight = 0.2, jitter.size = 0.3, ncol = 2, color.panel = color_list)
@@ -851,7 +843,7 @@ multi_dittoPlot(bapd8.integrated, vars = fig3a, group.by = "new_clusters",
 
 Structural proteins
 
-```{r fig3b, dpi = 150, fig.width=7, fig.height=3, fig.cap="Fig3B: Violin plots showing expression (average log fold change) for genes encoding Structural proteins" }
+```{r fig3b, fig.width=7, fig.height=3, fig.cap="Fig3B: Violin plots showing expression (average log fold change) for genes encoding Structural proteins" }
 fig3b <- c("KRT7", "KRT23")
 multi_dittoPlot(bapd8.integrated, vars = fig3b, group.by = "new_clusters",
                        vlnplot.lineweight = 0.2, jitter.size = 0.3, ncol = 2, color.panel = color_list)
@@ -859,7 +851,7 @@ multi_dittoPlot(bapd8.integrated, vars = fig3b, group.by = "new_clusters",
 
 Hormones
 
-```{r fig3c, dpi = 150, fig.width=7, fig.height=3, fig.cap="Fig3C: Violin plots showing expression (average log fold change) for genes encoding Hormones" }
+```{r fig3c, fig.width=7, fig.height=3, fig.cap="Fig3C: Violin plots showing expression (average log fold change) for genes encoding Hormones" }
 fig3c <- c("CGA", "PGF")
 multi_dittoPlot(bapd8.integrated, vars = fig3c, group.by = "new_clusters",
                        vlnplot.lineweight = 0.2, jitter.size = 0.3, ncol = 2, color.panel = color_list)
@@ -867,7 +859,7 @@ multi_dittoPlot(bapd8.integrated, vars = fig3c, group.by = "new_clusters",
 
 Transporters and Carcinoembryonic Antigen
 
-```{r fig3d, dpi = 150, fig.width=7, fig.height=3, fig.cap="Fig3D: Violin plots showing expression (average log fold change) for genes encoding Transporters and Carcinoembryonic Antigen" }
+```{r fig3d, fig.width=7, fig.height=3, fig.cap="Fig3D: Violin plots showing expression (average log fold change) for genes encoding Transporters and Carcinoembryonic Antigen" }
 fig3d <- c("SLC40A1", "XAGE2")
 multi_dittoPlot(bapd8.integrated, vars = fig3d, group.by = "new_clusters",
                        vlnplot.lineweight = 0.2, jitter.size = 0.3, ncol = 2, color.panel = color_list)
@@ -875,7 +867,7 @@ multi_dittoPlot(bapd8.integrated, vars = fig3d, group.by = "new_clusters",
 
 Enzymes
 
-```{r fig3e, dpi = 150, fig.width=7, fig.height=3, fig.cap="Fig3E: Violin plots showing expression (average log fold change) for genes encoding enzymes" }
+```{r fig3e, fig.width=7, fig.height=3, fig.cap="Fig3E: Violin plots showing expression (average log fold change) for genes encoding enzymes" }
 fig3e <- c("CYP11A1", "HSD3B1")
 multi_dittoPlot(bapd8.integrated, vars = fig3e, group.by = "new_clusters",
                        vlnplot.lineweight = 0.2, jitter.size = 0.3, ncol = 2, color.panel = color_list)
@@ -883,7 +875,7 @@ multi_dittoPlot(bapd8.integrated, vars = fig3e, group.by = "new_clusters",
 
 Long non-coding RNAs
 
-```{r fig3f, dpi = 150, fig.width=7, fig.height=3, fig.cap="Fig3F: Violin plots showing expression (average log fold change) for genes encoding lncRNAs" }
+```{r fig3f, fig.width=7, fig.height=3, fig.cap="Fig3F: Violin plots showing expression (average log fold change) for genes encoding lncRNAs" }
 fig3f <- c("MALAT1", "NEAT1")
 multi_dittoPlot(bapd8.integrated, vars = fig3f, group.by = "new_clusters",
                        vlnplot.lineweight = 0.2, jitter.size = 0.3, ncol = 2, color.panel = color_list)
@@ -930,7 +922,7 @@ sct.cluster6.genes <- sct.cluster6.genes$Gene.name
 x = list(sct.cluster5.genes, sct.cluster6.genes)
 ```
 
-```{r fig5a, fig.show='hold', dpi = 150, fig.width=6, fig.height=5, fig.cap="Fig5A: STB specific genes shared by clusters 5 and 6"}
+```{r fig5a, fig.show='hold', fig.width=6, fig.height=5, fig.cap="Fig5A: STB specific genes shared by clusters 5 and 6"}
 names(x) <- c("STB genes of Cluster 5","STB genes of Cluster 6")
 ggvenn(
     x, 
@@ -941,7 +933,7 @@ ggvenn(
 )
 ```
 
-```{r fig5bc, out.width=c('50%', '50%'), fig.show='hold', dpi = 150, fig.width=2, fig.height=5, fig.cap="Fig5: STB specific genes shared by clusters 5 and 6. Some highly expressed STB specific genes show (A) higher expression in cluster 5 and (B) higher expression in cluster 6" }
+```{r fig5bc, out.width=c('50%', '50%'), fig.show='hold', fig.width=2, fig.height=5, fig.cap="Fig5: STB specific genes shared by clusters 5 and 6. Some highly expressed STB specific genes show (A) higher expression in cluster 5 and (B) higher expression in cluster 6" }
 
 fig5b <- c("KRT8", "S100P", "XAGE2")
 fig5b <- c("ERVV-1", "TBX3", "GRHL1")
@@ -957,19 +949,19 @@ multi_dittoPlot(cluster5n6, vars = fig5b, group.by = "new_clusters",
 
 ### Figure S4
 
-```{r figS4a, dpi = 150, fig.width=6, fig.height=3, fig.cap="Fig S4A: Violin plots showing low expression levels for mesoderm genes" }
+```{r figS4a, fig.width=6, fig.height=3, fig.cap="Fig S4A: Violin plots showing low expression levels for mesoderm genes" }
 mesoderm <- c("FOXC1", "TWIST2")
 endoderm <- c("AFP", "GATA6")
 ectoderm <- c("NES", "PAX6")
 multi_dittoPlot(bapd8.integrated, vars = mesoderm, group.by = "new_clusters",
                        vlnplot.lineweight = 0.2, jitter.size = 0.3, ncol = 1, color.panel = color_list)
 ```
-```{r figS4b, dpi = 150, fig.width=6, fig.height=3, fig.cap="Fig S4B: Violin plots showing low expression levels for endoderm genes" }
+```{r figS4b, fig.width=6, fig.height=3, fig.cap="Fig S4B: Violin plots showing low expression levels for endoderm genes" }
 multi_dittoPlot(bapd8.integrated, vars = endoderm, group.by = "new_clusters",
                        vlnplot.lineweight = 0.2, jitter.size = 0.3, ncol = 1, color.panel = color_list)
 ```
 
-```{r figS4c, dpi = 150, fig.width=6, fig.height=3, fig.cap="Fig S4C: Violin plots showing low expression levels for ectoderm genes" }
+```{r figS4c, fig.width=6, fig.height=3, fig.cap="Fig S4C: Violin plots showing low expression levels for ectoderm genes" }
 multi_dittoPlot(bapd8.integrated, vars = ectoderm, group.by = "new_clusters",
                        vlnplot.lineweight = 0.2, jitter.size = 0.3, ncol = 1, color.panel = color_list)
 ```
@@ -979,14 +971,14 @@ multi_dittoPlot(bapd8.integrated, vars = ectoderm, group.by = "new_clusters",
 ### Figure S5
 
 
-```{r figS5, dpi = 150, fig.width=6, fig.height=8, fig.cap="Fig S5: Expression levels of Cellular Proliferation Markers across clusters" }
+```{r figS5, fig.width=6, fig.height=8, fig.cap="Fig S5: Expression levels of Cellular Proliferation Markers across clusters" }
 cpm <- c("CCNB1", "MKI67", "PCNA", "CENPF")
 multi_dittoPlot(bapd8.integrated, vars = cpm, group.by = "new_clusters", 
                 vlnplot.lineweight = 0.2, jitter.size = 0.3, ncol = 1, color.panel = color_list)
 ```
 
 
-```{r figS6, out.width=c('33%', '33%', '33%'), fig.show='hold', dpi = 150, fig.width=2, fig.height=8, fig.cap="Fig S6: Expression levels of genes in Clusters 2 and 3."}
+```{r figS6, out.width=c('33%', '33%', '33%'), fig.show='hold', fig.width=2, fig.height=8, fig.cap="Fig S6: Expression levels of genes in Clusters 2 and 3."}
 figs6a <- c("TLE4", "PCDH9", "MAML2", "TMSB4Y", "CA3")
 figs6b <- c("TAGLN", "TMSB10", "S100A11", "S100A6", "S100A10")
 figs6c <- c("ACTB", "ACTG1", "IL32", "MYL6", "TPM1")
@@ -998,14 +990,14 @@ multi_dittoPlot(cluster2n3, vars = figs6c, group.by = "new_clusters",
                 vlnplot.lineweight = 0.2, jitter.size = 0.3, ncol = 1, color.panel = c(color_list[2:3]))
 ```
 
-```{r figS7, dpi = 150, fig.width=5, fig.height=9, fig.cap="Fig S7: Expression differences of selected genes across treatments shown as violin plots." }
+```{r figS7, fig.width=5, fig.height=9, fig.cap="Fig S7: Expression differences of selected genes across treatments shown as violin plots." }
 figs7 <- c("SLC2A3", "CLIC3", "FN1", "APOE",  "COL3A1", "LUM")
-multi_dittoPlot(cluster2356, vars = figs7, group.by = "new_clusters", split.by = "replicate",
-                vlnplot.lineweight = 0.2, jitter.size = 0.3, ncol = 1, color.panel = c("#0571b0", "#0571b0", "#0571b0", "#0571b0"))
+multi_dittoPlot(cluster2356, vars = figs7, group.by = "new_clusters", split.by = "replicate", 
+                vlnplot.lineweight = 0.2, jitter.size = 0.3, ncol = 1, color.by = "replicate", color.panel = c("#0571b0", "#ca0020"))
 ```
 
 
-```{r figS8, dpi = 150, fig.width=8, fig.height=4, fig.cap="Fig S8: SOX2 localization in the dimensionality reduction plot  and its (B) expression  across clusters."}
+```{r figS8, fig.width=8, fig.height=4, fig.cap="Fig S8: SOX2 localization in the dimensionality reduction plot  and its (B) expression  across clusters."}
 figs8a <- FeaturePlot(bapd8.integrated, features = "SOX2", min.cutoff = "q9")
 figs8b <- VlnPlot(bapd8.integrated, "SOX2", group.by = "new_clusters")
 figs8a | figs8b
@@ -1099,15 +1091,15 @@ bapd8.integrated <- cerebroApp::getMarkerGenes(
   organism = 'hg',
   groups = c('replicate', 'orig.ident', 'cluster' )
 )
-#bapd8.integrated <- cerebroApp::getEnrichedPathways(
-#  bapd8.integrated,
-#  databases = c("GO_Biological_Process_2018", "GO_Cellular_Component_2018",
-#                "GO_Molecular_Function_2018", "KEGG_2016", "WikiPathways_2016", "Reactome_2016",
-#                "Panther_2016", "Human_Gene_Atlas", "Mouse_Gene_Atlas"),
-#  adj_p_cutoff = 0.05,
-#  max_terms = 100,
-#  URL_API = "http://amp.pharm.mssm.edu/Enrichr/enrich"
-#)
+bapd8.integrated <- cerebroApp::getEnrichedPathways(
+  bapd8.integrated,
+  databases = c("GO_Biological_Process_2018", "GO_Cellular_Component_2018",
+                "GO_Molecular_Function_2018", "KEGG_2016", "WikiPathways_2016", "Reactome_2016",
+                "Panther_2016", "Human_Gene_Atlas", "Mouse_Gene_Atlas"),
+  adj_p_cutoff = 0.05,
+  max_terms = 100,
+  URL_API = "http://amp.pharm.mssm.edu/Enrichr/enrich"
+)
 cerebroApp::exportFromSeurat(
   bapd8.integrated,
   assay = "RNA",

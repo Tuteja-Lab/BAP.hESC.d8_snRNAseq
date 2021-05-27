@@ -35,7 +35,7 @@ The packages that are needed for the analyses were loaded as below. If you need 
 
 
 ```{r, warnings=TRUE, messages=FALSE}
-setwd("~/TutejaLab/snn-results_20210308_testing-installation")
+setwd("~/TutejaLab/snn-results_20210526")
 # load the modules
 library(Seurat)
 library(SeuratWrappers)
@@ -74,7 +74,7 @@ We used the inbuilt function to import this data and to create a `Seurat` object
 ```{r dataset}
 
 experiment_name = "BAP"
-dataset_loc <- "Z:/Documents/snRNAseq-placenta-project/expression-data"
+dataset_loc <- "X:/Documents/snRNAseq-placenta-project/expression-data"
 ids <- c("5pcO2_r1", "5pcO2_r2", "20pcO2_r1", "20pcO2_r2")
 # function d10x.data
 d10x.data <- sapply(ids, function(i){
@@ -487,7 +487,7 @@ grouped_violinPlots(markers.filtered.names.9, 9)
 The function used for running PCE is as follows:
 
 ```{r runPCE}
-l <- load(file = "~/TutejaLab/PlacentaEnrich/combine-test-expression1.Rdata")
+l <- load(file = "~/PlacentaEnrich/combine-test-expression1.Rdata")
 humanGeneMapping <- dataset$GRCH38$humanGeneMapping
 d <- dataset$PlacentaDeciduaBloodData
 data <- d$expressionData
@@ -498,8 +498,6 @@ runpce <- function(inputgenelist, clusternumber) {
   humanGene<-humanGeneMapping[humanGeneMapping$Gene.name %in% inputGenes,]
   inputGenes<-humanGene$Gene
   expressionData<-data[intersect(row.names(data),humanGeneMapping$Gene),]
-  se<-SummarizedExperiment(assays = SimpleList(as.matrix(expressionData)),rowData = row.names(expressionData),colData = colnames(expressionData))
-  cellSpecificGenesExp<-teGeneRetrieval(se,expressedGeneThreshold = 1)
   se<-SummarizedExperiment(assays = SimpleList(as.matrix(expressionData)),rowData = row.names(expressionData),colData = colnames(expressionData))
   cellSpecificGenesExp<-teGeneRetrieval(se,expressedGeneThreshold = 1)
   print(length(inputGenes))
@@ -726,21 +724,21 @@ eval(parse(text=commands.j))
 lhs.k  <- paste("clus", 1:num.clusters, '.five.twenty$diffexpressed <- "other genes"', sep="")
 commands.k <- paste(lhs.k , sep=";")
 eval(parse(text=commands.k))
-lhs.l  <- paste('clus', 1:num.clusters,'.five.twenty$diffexpressed[clus',1:num.clusters,'.five.twenty$log2fc >= 1 & clus', 1:num.clusters,'.five.twenty$p_val < 0.05] <- "up in 20% O2"', sep="")
+lhs.l  <- paste('clus', 1:num.clusters,'.five.twenty$diffexpressed[clus',1:num.clusters,'.five.twenty$log2fc >= 0.584962501 & clus', 1:num.clusters,'.five.twenty$p_val_adj <= 0.05] <- "up in 5% O2"', sep="")
 commands.l <- paste(lhs.l , sep=";")
 eval(parse(text=commands.l))
-lhs.m  <- paste('clus', 1:num.clusters,'.five.twenty$diffexpressed[clus',1:num.clusters,'.five.twenty$log2fc <= -1 & clus', 1:num.clusters,'.five.twenty$p_val < 0.05] <- "up in 5% O2"', sep="")
+lhs.m  <- paste('clus', 1:num.clusters,'.five.twenty$diffexpressed[clus',1:num.clusters,'.five.twenty$log2fc <= -0.584962501 & clus', 1:num.clusters,'.five.twenty$p_val_adj <= 0.05] <- "up in 20% O2"', sep="")
 commands.m <- paste(lhs.m , sep=";")
 eval(parse(text=commands.m))
 lhs.n  <- paste('clus', 1:num.clusters,'.five.twenty$delabel <- ""', sep="")
 commands.n <- paste(lhs.n , sep=";")
 eval(parse(text=commands.n))
-lhs.o  <- paste('clus', 1:num.clusters,'.five.twenty$delabel[clus', 1:num.clusters,'.five.twenty$log2fc >= 1 & clus', 1:num.clusters,'.five.twenty$p_val < 0.05]', sep="")
-rhs.o  <- paste('clus', 1:num.clusters,'.five.twenty$Gene[clus', 1:num.clusters,'.five.twenty$log2fc >= 1 & clus', 1:num.clusters,'.five.twenty$p_val < 0.05]', sep="")
+lhs.o  <- paste('clus', 1:num.clusters,'.five.twenty$delabel[clus', 1:num.clusters,'.five.twenty$log2fc >= 0.584962501 & clus', 1:num.clusters,'.five.twenty$p_val_adj <= 0.05]', sep="")
+rhs.o  <- paste('clus', 1:num.clusters,'.five.twenty$Gene[clus', 1:num.clusters,'.five.twenty$log2fc >= 0.584962501 & clus', 1:num.clusters,'.five.twenty$p_val_adj <= 0.05]', sep="")
 commands.o <- paste(paste(lhs.o, rhs.o, sep="<-"), collapse=";")
 eval(parse(text=commands.o))
-lhs.p  <- paste('clus', 1:num.clusters,'.five.twenty$delabel[clus', 1:num.clusters,'.five.twenty$log2fc < -1 & clus', 1:num.clusters,'.five.twenty$p_val < 0.05]', sep="") 
-rhs.p  <- paste('clus', 1:num.clusters,'.five.twenty$Gene[clus', 1:num.clusters,'.five.twenty$log2fc < -1 & clus', 1:num.clusters,'.five.twenty$p_val < 0.05]', sep="")
+lhs.p  <- paste('clus', 1:num.clusters,'.five.twenty$delabel[clus', 1:num.clusters,'.five.twenty$log2fc <= -0.584962501 & clus', 1:num.clusters,'.five.twenty$p_val_adj <= 0.05]', sep="") 
+rhs.p  <- paste('clus', 1:num.clusters,'.five.twenty$Gene[clus', 1:num.clusters,'.five.twenty$log2fc <= -0.584962501 & clus', 1:num.clusters,'.five.twenty$p_val_adj <= 0.05]', sep="")
 commands.p <- paste(paste(lhs.p, rhs.p, sep="<-"), collapse=";")
 eval(parse(text=commands.p))
 ```
@@ -756,23 +754,27 @@ de <- ggplot(data=mydf, aes(x=log2fc, y=-log10(p_val), col=diffexpressed, label=
   scale_color_manual(name = "Expression", values=c("#4d4d4d", "#ca0020", "#0571b0")) +
   ggtitle(paste("Cluster ", clus.number, ": 20% O2 vs. 5% O2")) +
   xlab("Log2 fold change") +
-  ylab("-log10 pvalue") +
+  ylab("-log10 pvalue (adjusted)") +
   theme(legend.text.align = 0)
 return(de)
 }
 ```
 
 
+
 ### Volcano plot for cluster 1
 
 ```{r de.clus1, fig.width=8, fig.height=6, fig.cap="Fig.6-1: Interactive Volcano plot showing genes upregulated in 5% and 20% oxygen conditions for cluster 1" }
 ggplotly(myVolcanoPlot(clus1.five.twenty, 1))
+
+
 ```
 
 ### Volcano plot for cluster 2
 
 ```{r de.clus2, fig.width=8, fig.height=6, fig.cap="Fig.6-2: Interactive Volcano plot showing genes upregulated in 5% and 20% oxygen conditions for cluster 2" }
 ggplotly(myVolcanoPlot(clus2.five.twenty, 2))
+ggsave("Figure_6_A.svg", dpi=900, width = 8, height = 6)
 ```
 
 ### Volcano plot for cluster 3
@@ -936,10 +938,10 @@ ggvenn(
 
 ```{r fig5bc, out.width=c('50%', '50%'), fig.show='hold', fig.width=2, fig.height=5, fig.cap="Fig5: STB specific genes shared by clusters 5 and 6. Some highly expressed STB specific genes show (A) higher expression in cluster 5 and (B) higher expression in cluster 6" }
 
-fig5b <- c("KRT8", "S100P", "XAGE2")
+fig5a <- c("KRT8", "S100P", "XAGE2")
 fig5b <- c("ERVV-1", "TBX3", "GRHL1")
 
-multi_dittoPlot(cluster5n6, vars = fig5b, group.by = "new_clusters",
+multi_dittoPlot(cluster5n6, vars = fig5a, group.by = "new_clusters",
                 vlnplot.lineweight = 0.2, jitter.size = 0.3, ncol = 1, color.panel = c(color_list[5:6]))
 
 multi_dittoPlot(cluster5n6, vars = fig5b, group.by = "new_clusters",

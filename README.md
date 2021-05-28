@@ -16,7 +16,7 @@ Raw datasets are available for download upon publication from NCBI GEO [GSE17176
 
 ### Contacts
 1. Project related questions: Geetu Tuteja
-2. Scripts and workflow related questions: please open an issue here on GitHub.
+2. Scripts and workflow related questions: please open an [issue](https://github.com/Tuteja-Lab/BAP.hESC.d8_snRNAseq/issues/new) here on GitHub.
 
 
 ### Publication

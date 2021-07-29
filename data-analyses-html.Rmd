@@ -30,15 +30,14 @@ knitr::opts_chunk$set(
 
 ## Prerequisites
 
-This experiment has 2 conditions (BAP treated hESC exposed to 20% oxygen and 5% oxygen), with 2 replicates each. The details are provided in the manuscript. 
+This experiment has 2 conditions (BAP treated hESC exposed to 20% oxygen and 5% oxygen), with 2 replicates each. The details are provided in the manuscript.
 The packages that are needed for the analyses were loaded as below. If you need the version information, session information is printed at the bottom of this wiki.
 
 
 ```{r, warnings=TRUE, messages=FALSE}
-setwd("~/TutejaLab/snn-results_20210526")
+setwd("~/TutejaLab/combined-exp_20210529")
 # load the modules
 library(Seurat)
-library(SeuratWrappers)
 library(knitr)
 library(kableExtra)
 library(ggplot2)
@@ -64,6 +63,7 @@ library(DT)
 library(cerebroApp)
 library(ape)
 library(enrichR)
+library(SeuratWrappers)
 ```
 
 ## Importing 10x Datasets
@@ -112,27 +112,27 @@ metadata$cells <- rownames(metadata)
 metadata <- metadata %>%
   dplyr::rename(seq_folder = orig.ident,
                 nUMI = nCount_RNA,
-                nGene = nFeature_RNA, 
+                nGene = nFeature_RNA,
                 seq_folder = orig.ident)
 
-p <- ggplot(dat = metadata, aes(x=nUMI, y=nGene, color=mitoRatio)) + 
-  geom_point(alpha = 0.5) + 
+p <- ggplot(dat = metadata, aes(x=nUMI, y=nGene, color=mitoRatio)) +
+  geom_point(alpha = 0.5) +
   scale_colour_gradient(low = "gray90", high = "black") + labs(colour="MT ratio") +
   theme_bw(base_size = 12) +
   theme(
     panel.grid.major = element_blank(),
     panel.grid.minor = element_blank(),
     strip.background = element_blank(),
-    panel.border = element_rect(colour = "black")) + 
+    panel.border = element_rect(colour = "black")) +
   xlab("RNA counts") + ylab("Gene counts") +
   stat_smooth(method=lm) +
-  facet_wrap(~seq_folder, labeller = labeller(seq_folder = 
+  facet_wrap(~seq_folder, labeller = labeller(seq_folder =
                                                 c("20pcO2_r1" = "20% Oxygen (rep1)",
                                                   "20pcO2_r2" = "20% Oxygen (rep2)",
                                                   "5pcO2_r1" = "5% Oxygen (rep1)",
                                                   "5pcO2_r2" = "5% Oxygen (rep2)"))) +
   scale_y_continuous(label=comma) +
-  scale_x_continuous(label=comma) 
+  scale_x_continuous(label=comma)
 
 ggplotly(p)
 ```
@@ -140,7 +140,7 @@ ggplotly(p)
 ### Number of nuclei per sample
 
 ```{r snrnaseqQC2, fig.width=6, fig.height=4, fig.cap= "Number of nuclei found in each sample" }
-ggplot(metadata, aes(x=seq_folder, fill=seq_folder)) + 
+ggplot(metadata, aes(x=seq_folder, fill=seq_folder)) +
   geom_bar() +
   theme_classic() +
   theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1)) +
@@ -151,9 +151,9 @@ ggplot(metadata, aes(x=seq_folder, fill=seq_folder)) +
 ### Density of nuclei per sample
 
 ```{r snrnaseqQC3, fig.width=6, fig.height=4, fig.cap="Density of nuclei vs. UMIs"  }
-ggplot(metadata, aes(color=seq_folder, x=nUMI, fill= seq_folder)) + 
-  geom_density(alpha = 0.2) + 
-  scale_x_log10() + 
+ggplot(metadata, aes(color=seq_folder, x=nUMI, fill= seq_folder)) +
+  geom_density(alpha = 0.2) +
+  scale_x_log10() +
   theme_classic() +
   ylab("Cell density") +
   geom_vline(xintercept = 500)
@@ -162,8 +162,8 @@ ggplot(metadata, aes(color=seq_folder, x=nUMI, fill= seq_folder)) +
 ### Number of Nuclei vs. genes
 
 ```{r snrnaseqQC4, fig.width=6, fig.height=4, fig.cap="Nubmer of nuclei vs. genes"}
-ggplot(metadata, aes(x=seq_folder, y=log10(nGene), fill=seq_folder)) + 
-  geom_boxplot() + 
+ggplot(metadata, aes(x=seq_folder, y=log10(nGene), fill=seq_folder)) +
+  geom_boxplot() +
   theme_classic() +
   theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1)) +
   theme(plot.title = element_text(hjust=0.5, face="bold")) +
@@ -183,9 +183,9 @@ ggplot(metadata, aes(x=log10GenesPerUMI, color = seq_folder, fill=seq_folder)) +
 ### Mitochondrial density across samples
 
 ```{r snrnaseqQC6, fig.width=6, fig.height=4, fig.cap="Mitochondrial density across samples"}
-ggplot(metadata, aes(color=seq_folder, x=mitoRatio, fill=seq_folder)) + 
-  geom_density(alpha = 0.2) + 
-  scale_x_log10() + 
+ggplot(metadata, aes(color=seq_folder, x=mitoRatio, fill=seq_folder)) +
+  geom_density(alpha = 0.2) +
+  scale_x_log10() +
   theme_classic() +
   geom_vline(xintercept = 0.2)
 ```
@@ -210,7 +210,7 @@ datatable(bapd8.combined@meta.data, rownames = TRUE, filter="top", options = lis
 ### set up the metadata file and organize
 
 ```{r filtering2, fig.width=8, fig.height=4.5 }
-v1 <- VlnPlot(bapd8.combined, features = "nFeature_RNA", pt.size = 1) + 
+v1 <- VlnPlot(bapd8.combined, features = "nFeature_RNA", pt.size = 1) +
   geom_hline(yintercept=200, color = "red", size=1) +
   geom_hline(yintercept=7500, color = "red", size=1) +
   theme(legend.position = "none")
@@ -327,13 +327,13 @@ d2 <- enhancedDimPlot(object = bapd8.integrated, grouping_var = 'replicate', red
   ggtitle("B") +
   xlab("UMAP_1") +
   ylab("UMAP_2") +
-  theme_classic() + 
+  theme_classic() +
   theme(legend.justification = c(1, 1), legend.position = c(1, 1), plot.title = element_text(face = "bold")) +
-  scale_colour_manual(name = "Conditions", 
-                      labels = c(expression(paste('20% ', 'O'[2])), expression(paste('5% ', 'O'[2]))), 
+  scale_colour_manual(name = "Conditions",
+                      labels = c(expression(paste('20% ', 'O'[2])), expression(paste('5% ', 'O'[2]))),
                       values = c("20pcO2" = "#0571b0", "5pcO2" = "#ca0020")) +
-  scale_fill_manual(name = "Conditions", 
-                    labels = c(expression(paste('20% ', 'O'[2])), expression(paste('5% ', 'O'[2]))), 
+  scale_fill_manual(name = "Conditions",
+                    labels = c(expression(paste('20% ', 'O'[2])), expression(paste('5% ', 'O'[2]))),
                     values = c("20pcO2" = "#0571b0", "5pcO2" = "#ca0020")) +
   scale_linetype_manual(values = "blank")
 ggplotly(d2)
@@ -347,13 +347,13 @@ d3 <- enhancedDimPlot(object = bapd8.integrated, grouping_var = 'orig.ident', re
   ggtitle("C") +
   xlab("UMAP_1") +
   ylab("UMAP_2") +
-  theme_classic() + 
+  theme_classic() +
   theme(legend.justification = c(1, 1), legend.position = c(1, 1), plot.title = element_text(face = "bold")) +
-  scale_colour_manual(name = "Replicates", 
-                      labels = c(expression(paste('20% ', 'O'[2], ' rep1')), expression(paste('20% ', 'O'[2], ' rep2')), expression(paste('5% ', 'O'[2], ' rep1')), expression(paste('5% ', 'O'[2], ' rep1'))), 
+  scale_colour_manual(name = "Replicates",
+                      labels = c(expression(paste('20% ', 'O'[2], ' rep1')), expression(paste('20% ', 'O'[2], ' rep2')), expression(paste('5% ', 'O'[2], ' rep1')), expression(paste('5% ', 'O'[2], ' rep1'))),
                       values = c("20pcO2_r1" = "#0571b0", "20pcO2_r2" = "#92c5de", "5pcO2_r1" = "#ca0020", "5pcO2_r2" = "#f4a582")) +
-  scale_fill_manual(name = "Replicates", 
-                    labels = c(expression(paste('20% ', 'O'[2], ' rep1')), expression(paste('20% ', 'O'[2], ' rep2')), expression(paste('5% ', 'O'[2], ' rep1')), expression(paste('5% ', 'O'[2], ' rep1'))), 
+  scale_fill_manual(name = "Replicates",
+                    labels = c(expression(paste('20% ', 'O'[2], ' rep1')), expression(paste('20% ', 'O'[2], ' rep2')), expression(paste('5% ', 'O'[2], ' rep1')), expression(paste('5% ', 'O'[2], ' rep1'))),
                     values = c("20pcO2_r1" = "#0571b0", "20pcO2_r2" = "#92c5de", "5pcO2_r1" = "#ca0020", "5pcO2_r2" = "#f4a582")) +
   scale_linetype_manual(values = "blank")
 
@@ -413,15 +413,15 @@ ggplotColours <- function(n = 6, h = c(0, 360) + 15){
 color_list <- ggplotColours(n=9)
 
 grouped_violinPlots <- function(markersfile, clusternumber, seuratobject = bapd8.integrated) {
-  dittoPlotVarsAcrossGroups(seuratobject, markersfile, 
-                            group.by = "new_clusters", main = paste("Cluster ", clusternumber, " markers"), 
-                            xlab = "Clusters", 
-                            ylab = "Mean z-score expression", 
+  dittoPlotVarsAcrossGroups(seuratobject, markersfile,
+                            group.by = "new_clusters", main = paste("Cluster ", clusternumber, " markers"),
+                            xlab = "Clusters",
+                            ylab = "Mean z-score expression",
                             x.labels = c("Cluster 1", "Cluster 2", "Cluster 3", "Cluster 4",
-                                         "Cluster 5", "Cluster 6", "Cluster 7", "Cluster 8", "Cluster 9"), 
-                            vlnplot.lineweight = 0.5, 
-                            legend.show = FALSE, 
-                            jitter.size = 0.5, 
+                                         "Cluster 5", "Cluster 6", "Cluster 7", "Cluster 8", "Cluster 9"),
+                            vlnplot.lineweight = 0.5,
+                            legend.show = FALSE,
+                            jitter.size = 0.5,
                             color.panel = color_list)
 }
 ```
@@ -483,7 +483,7 @@ grouped_violinPlots(markers.filtered.names.9, 9)
 
 ## Run PlacentaCellEnrich on markers
 
-[`PlacentaCellEnrich`](https://www.sciencedirect.com/science/article/abs/pii/S0143400420304264) was run command-line using the [`TissueEnrich`](https://bioconductor.org/packages/release/bioc/html/TissueEnrich.html) R package. We used this to assign cell identity to cluster 2, 3, 5 and 6. 
+[`PlacentaCellEnrich`](https://www.sciencedirect.com/science/article/abs/pii/S0143400420304264) was run command-line using the [`TissueEnrich`](https://bioconductor.org/packages/release/bioc/html/TissueEnrich.html) R package. We used this to assign cell identity to cluster 2, 3, 5 and 6.
 The function used for running PCE is as follows:
 
 ```{r runPCE}
@@ -507,7 +507,7 @@ runpce <- function(inputgenelist, clusternumber) {
   row.names(cellDetails)<-cellDetails$RName
   enrichmentOutput$Tissue<- cellDetails[row.names(enrichmentOutput),"CellName"]
   ggplot(data = enrichmentOutput, mapping = aes(x = reorder (Tissue, -Log10PValue), Log10PValue, fill= Tissue)) +
-    geom_bar(stat = "identity") + theme_minimal() + 
+    geom_bar(stat = "identity") + theme_minimal() +
     theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1, size = 12),
           axis.text.y = element_text(size = 12),
           plot.margin = margin(10, 10, 10, 100), legend.position = "none",
@@ -580,19 +580,19 @@ Some plotting functions that we used for finalizing violin plots.
 
 ```{r vln.mod}
 # https://divingintogeneticsandgenomics.rbind.io/post/stacked-violin-plot-for-visualizing-single-cell-data-in-seurat/
-modify_vlnplot<- function(obj, 
-                          feature, 
-                          pt.size = 0, 
+modify_vlnplot<- function(obj,
+                          feature,
+                          pt.size = 0,
                           plot.margin = unit(c(-0.75, 0, -0.75, 0), "cm"),
                           ...) {
-  p<- VlnPlot(obj, features = feature, pt.size = pt.size, ... )  + 
-    xlab("") + ylab(feature) + ggtitle("") + 
-    theme(legend.position = "none", 
-          axis.text.x = element_blank(), 
-          axis.ticks.x = element_blank(), 
-          axis.title.y = element_text(size = rel(1), angle = 0), 
-          axis.text.y = element_text(size = rel(1)), 
-          plot.margin = plot.margin ) 
+  p<- VlnPlot(obj, features = feature, pt.size = pt.size, ... )  +
+    xlab("") + ylab(feature) + ggtitle("") +
+    theme(legend.position = "none",
+          axis.text.x = element_blank(),
+          axis.ticks.x = element_blank(),
+          axis.title.y = element_text(size = rel(1), angle = 0),
+          axis.text.y = element_text(size = rel(1)),
+          plot.margin = plot.margin )
   return(p)
 }
 
@@ -603,22 +603,22 @@ extract_max<- function(p){
 
 
 StackedVlnPlot<- function(obj, features,
-                          pt.size = 0, 
+                          pt.size = 0,
                           plot.margin = unit(c(-0.75, 0, -0.75, 0), "cm"),
                           ...) {
-  
+
   plot_list<- purrr::map(features, function(x) modify_vlnplot(obj = obj,feature = x, ...))
-  
+
   # Add back x-axis title to bottom plot. patchwork is going to support this?
   plot_list[[length(plot_list)]]<- plot_list[[length(plot_list)]] +
     theme(axis.text.x=element_text(), axis.ticks.x = element_line())
-  
-  # change the y-axis tick to only max value 
+
+  # change the y-axis tick to only max value
   ymaxs<- purrr::map_dbl(plot_list, extract_max)
-  plot_list<- purrr::map2(plot_list, ymaxs, function(x,y) x + 
-                            scale_y_continuous(breaks = c(y)) + 
+  plot_list<- purrr::map2(plot_list, ymaxs, function(x,y) x +
+                            scale_y_continuous(breaks = c(y)) +
                             expand_limits(y = y))
-  
+
   p<- patchwork::wrap_plots(plotlist = plot_list, ncol = 1)
   return(p)
 }
@@ -676,7 +676,7 @@ Generate a summary table showing the number of cells in each cluster, broken dow
 
 ```{r clusterstats, fig.width=8, fig.height=5 }
 cells <- bapd8.integrated@meta.data	%>%
-  dplyr::group_by(orig.ident,	new_clusters, replicate)	%>%	
+  dplyr::group_by(orig.ident,	new_clusters, replicate)	%>%
   dplyr::summarise(length(new_clusters)) %>%
   dplyr::rename(sample = orig.ident,
                 cluster = new_clusters,
@@ -685,7 +685,7 @@ cells <- bapd8.integrated@meta.data	%>%
 
 #head(cells)
 #datatable(cells, rownames = TRUE, filter="top", options = list(pageLength = 10, scrollX=T))
-#cells %>% 
+#cells %>%
  # group_by(orig.ident, new_clusters ) %>%
  # summarize(`length(new_clusters)`)
 
@@ -737,7 +737,7 @@ lhs.o  <- paste('clus', 1:num.clusters,'.five.twenty$delabel[clus', 1:num.cluste
 rhs.o  <- paste('clus', 1:num.clusters,'.five.twenty$Gene[clus', 1:num.clusters,'.five.twenty$log2fc >= 0.584962501 & clus', 1:num.clusters,'.five.twenty$p_val_adj <= 0.05]', sep="")
 commands.o <- paste(paste(lhs.o, rhs.o, sep="<-"), collapse=";")
 eval(parse(text=commands.o))
-lhs.p  <- paste('clus', 1:num.clusters,'.five.twenty$delabel[clus', 1:num.clusters,'.five.twenty$log2fc <= -0.584962501 & clus', 1:num.clusters,'.five.twenty$p_val_adj <= 0.05]', sep="") 
+lhs.p  <- paste('clus', 1:num.clusters,'.five.twenty$delabel[clus', 1:num.clusters,'.five.twenty$log2fc <= -0.584962501 & clus', 1:num.clusters,'.five.twenty$p_val_adj <= 0.05]', sep="")
 rhs.p  <- paste('clus', 1:num.clusters,'.five.twenty$Gene[clus', 1:num.clusters,'.five.twenty$log2fc <= -0.584962501 & clus', 1:num.clusters,'.five.twenty$p_val_adj <= 0.05]', sep="")
 commands.p <- paste(paste(lhs.p, rhs.p, sep="<-"), collapse=";")
 eval(parse(text=commands.p))
@@ -804,7 +804,7 @@ ggplotly(myVolcanoPlot(clus7.five.twenty, 7))
 ```
 ### Volcano plot for cluster 8
 
-```{r de.clus8, fig.width=8, fig.height=6, fig.cap="Fig.6-8: Interactive Volcano plot showing genes upregulated in 5% and 20% oxygen conditions for cluster 8" } 
+```{r de.clus8, fig.width=8, fig.height=6, fig.cap="Fig.6-8: Interactive Volcano plot showing genes upregulated in 5% and 20% oxygen conditions for cluster 8" }
 ggplotly(myVolcanoPlot(clus8.five.twenty, 8))
 ```
 ### Volcano plot for cluster 9
@@ -928,10 +928,10 @@ x = list(sct.cluster5.genes, sct.cluster6.genes)
 ```{r fig5a, fig.show='hold', fig.width=6, fig.height=5, fig.cap="Fig5A: STB specific genes shared by clusters 5 and 6"}
 names(x) <- c("STB genes of Cluster 5","STB genes of Cluster 6")
 ggvenn(
-    x, 
+    x,
     fill_color = color_list[5:6],
-    stroke_size = NA, 
-    set_name_size = 4, 
+    stroke_size = NA,
+    set_name_size = 4,
     show_percentage = FALSE
 )
 ```
@@ -976,7 +976,7 @@ multi_dittoPlot(bapd8.integrated, vars = ectoderm, group.by = "new_clusters",
 
 ```{r figS5, fig.width=6, fig.height=8, fig.cap="Fig S5: Expression levels of Cellular Proliferation Markers across clusters" }
 cpm <- c("CCNB1", "MKI67", "PCNA", "CENPF")
-multi_dittoPlot(bapd8.integrated, vars = cpm, group.by = "new_clusters", 
+multi_dittoPlot(bapd8.integrated, vars = cpm, group.by = "new_clusters",
                 vlnplot.lineweight = 0.2, jitter.size = 0.3, ncol = 1, color.panel = color_list)
 ```
 
@@ -995,7 +995,7 @@ multi_dittoPlot(cluster2n3, vars = figs6c, group.by = "new_clusters",
 
 ```{r figS7, fig.width=5, fig.height=9, fig.cap="Fig S7: Expression differences of selected genes across treatments shown as violin plots." }
 figs7 <- c("SLC2A3", "CLIC3", "FN1", "APOE",  "COL3A1", "LUM")
-multi_dittoPlot(cluster2356, vars = figs7, group.by = "new_clusters", split.by = "replicate", 
+multi_dittoPlot(cluster2356, vars = figs7, group.by = "new_clusters", split.by = "replicate",
                 vlnplot.lineweight = 0.2, jitter.size = 0.3, ncol = 1, color.by = "replicate", color.panel = c("#0571b0", "#ca0020"))
 ```
 

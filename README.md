@@ -23,4 +23,4 @@ Raw datasets are available for download upon publication from NCBI GEO [GSE17176
 
 If you use the scripts from this repository in your research, please cite this publication:
 
-_coming soon_
+Teka Khan, Arun S. Seetharam, Jie Zhou, Nathan J. Bivens, Danny J. Schust, Toshihiko Ezashi, Geetu Tuteja, and R. Michael Roberts. "Single nucleus RNA sequence (snRNAseq) analysis of the spectrum of trophoblast lineages generated from human pluripotent stem cells _in vitro_." _Frontiers in Cell and Developmental Biology_ 9: 1881, 2021.
